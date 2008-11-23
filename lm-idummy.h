@@ -37,39 +37,12 @@ struct _LmIDummyIface {
     GTypeInterface parent;
 
     /* <vtable> */
-    void     (*connect)      (LmIDummy *idummy);
-    gboolean (*write)        (LmIDummy *idummy,
-                              gchar    *buf,
-                              gsize     len);
-    gboolean (*read)         (LmIDummy *idummy,
-                              gchar    *buf,
-                              gsize     buf_len,
-                              gsize    *read_len);
-    void     (*disconnect)   (LmIDummy *idummy);
+    int     (*function)      (LmIDummy *idummy);
 };
-
-typedef void  (*LmIDummyCallback)  (LmIDummy *idummy,
-                                    guint     status_code,
-                                    gpointer  user_data);
 
 GType          lm_idummy_get_type          (void);
 
-LmIDummy *     lm_idummy_new               (const gchar *host,
-                                            guint        port);
-/* Use DNS lookup to find the port and the host */
-LmIDummy *     lm_idummy_new_to_service    (const gchar *service);
-
-/* All async functions so doesn't make a lot of sense to return anything */
-/* Use LmIDummyCallback instead of signal for the connect result */
-void           lm_idummy_connect           (LmIDummy    *idummy);
-gboolean       lm_idummy_write             (LmIDummy    *idummy,
-                                            gchar       *buf,
-                                            gsize        len);
-gboolean       lm_idummy_read              (LmIDummy    *idummy,
-                                            gchar       *buf,
-                                            gsize        buf_len,
-                                            gsize       *read_len);
-void           lm_idummy_disconnect        (LmIDummy    *idummy);
+gint           lm_idummy_function          (LmIDummy *idummy);
 
 G_END_DECLS
 

@@ -27,8 +27,6 @@ static void    idummy_base_init (LmIDummyIface *iface);
 
 enum {
     READABLE,
-    WRITABLE,
-    DISCONNECTED,
     LAST_SIGNAL
 };
 
@@ -72,98 +70,19 @@ idummy_base_init (LmIDummyIface *iface)
                           _lm_marshal_VOID__VOID,
                           G_TYPE_NONE,
                           0);
-        signals[WRITABLE] = 
-            g_signal_new ("writable",
-                          LM_TYPE_IDUMMY,
-                          G_SIGNAL_RUN_LAST,
-                          0,
-                          NULL, NULL,
-                          _lm_marshal_VOID__VOID,
-                          G_TYPE_NONE,
-                          0);
-        signals[DISCONNECTED] =
-            g_signal_new ("disconnected",
-                          LM_TYPE_IDUMMY,
-                          G_SIGNAL_RUN_LAST,
-                          0,
-                          NULL, NULL,
-                          _lm_marshal_VOID__VOID,
-                          G_TYPE_NONE,
-                          0);
         initialized = TRUE;
     }
 }
 
-LmIDummy *
-lm_idummy_new (const gchar *host, guint port)
-{
-    g_return_val_if_fail (host != NULL, NULL);
-
-    return NULL;
-}
-
-/* Use DNS lookup to find the port and the host */
-LmIDummy *
-lm_idummy_new_to_service (const gchar *service)
-{
-    g_return_val_if_fail (service != NULL, NULL);
-
-    return NULL;
-}
-
-void 
-lm_idummy_connect (LmIDummy *idummy)
-{
-    g_return_if_fail (LM_IS_IDUMMY (idummy));
-
-
-    /* Initiate the connection process                 */
-    /* DNS lookup, connect thing, create IOchannel etc */
-    if (!LM_IDUMMY_GET_IFACE(idummy)->write) {
-        g_assert_not_reached ();
-    }
-
-    LM_IDUMMY_GET_IFACE(idummy)->connect (idummy);
-}
-
-gboolean
-lm_idummy_write (LmIDummy *idummy, gchar *buf, gsize len)
+int
+lm_idummy_function (LmIDummy *idummy)
 {
     g_return_val_if_fail (LM_IS_IDUMMY (idummy), FALSE);
-    g_return_val_if_fail (buf != NULL, FALSE);
 
-    if (!LM_IDUMMY_GET_IFACE(idummy)->write) {
+    if (!LM_IDUMMY_GET_IFACE(idummy)->function) {
         g_assert_not_reached ();
     }
 
-    return LM_IDUMMY_GET_IFACE(idummy)->write (idummy, buf, len);
-}
-
-gboolean
-lm_idummy_read (LmIDummy *idummy,
-                gchar    *buf,
-                gsize     buf_len,
-                gsize    *read_len)
-{
-    g_return_val_if_fail (LM_IS_IDUMMY (idummy), FALSE);
-    g_return_val_if_fail (buf != NULL, FALSE);
-
-    if (!LM_IDUMMY_GET_IFACE(idummy)->read) {
-        g_assert_not_reached ();
-    }
-
-    return LM_IDUMMY_GET_IFACE(idummy)->read (idummy, buf, buf_len, read_len);
-}
-
-void 
-lm_idummy_disconnect (LmIDummy *idummy)
-{
-    g_return_if_fail (LM_IS_IDUMMY (idummy));
-
-    if (!LM_IDUMMY_GET_IFACE(idummy)->disconnect) {
-        g_assert_not_reached ();
-    }
-
-    LM_IDUMMY_GET_IFACE(idummy)->disconnect (idummy);
+    return LM_IDUMMY_GET_IFACE(idummy)->function (idummy);
 }
 

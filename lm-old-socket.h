@@ -22,6 +22,7 @@
 #define __LM_OLD_SOCKET_H__
 
 #include <glib-object.h>
+#include "lm-socket.h"
 
 G_BEGIN_DECLS
 
@@ -43,7 +44,9 @@ struct LmOldSocketClass {
     GObjectClass parent_class;
 };
 
-GType   lm_old_socket_get_type  (void);
+GType       lm_old_socket_get_type  (void);
+
+LmSocket *  lm_old_socket_new       (GMainContext *context);
 
 G_END_DECLS
 

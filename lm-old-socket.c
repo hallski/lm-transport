@@ -29,7 +29,8 @@
 
 typedef struct LmOldSocketPriv LmOldSocketPriv;
 struct LmOldSocketPriv {
-    gint fd;
+    GMainContext *context;
+    gint          fd;
 };
 
 static void     old_socket_iface_init           (LmSocketIface     *iface);
@@ -97,6 +98,10 @@ old_socket_finalize (GObject *object)
 
     priv = GET_PRIV (object);
 
+    if (priv->context) {
+        g_main_context_unref (priv->context);
+    }
+
     (G_OBJECT_CLASS (lm_old_socket_parent_class)->finalize) (object);
 }
 
@@ -130,5 +135,19 @@ old_socket_write (LmTransport *transport, void *buf, gsize len)
 static void
 old_socket_disconnect (LmTransport *transport)
 {
+}
+
+LmSocket *
+lm_old_socket_new (GMainContext *context)
+{
+    LmOldSocket     *socket;
+    LmOldSocketPriv *priv;
+    
+    socket = g_object_new (LM_TYPE_OLD_SOCKET, NULL);
+    priv = GET_PRIV (socket);
+
+    priv->context = g_main_context_ref (context);
+
+    return LM_SOCKET (socket);
 }
 

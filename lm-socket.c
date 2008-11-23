@@ -21,6 +21,7 @@
 #include <config.h>
 
 #include "lm-marshal.h"
+#include "lm-old-socket.h"
 #include "lm-socket.h"
 
 static void    socket_base_init (LmSocketIface *iface);
@@ -85,9 +86,9 @@ socket_base_init (LmSocketIface *iface)
 }
 
 LmSocket *
-lm_socket_create (void)
+lm_socket_create (GMainContext *context)
 {
-    return NULL;
+    return lm_old_socket_new (context);
 }
 
 void

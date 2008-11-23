@@ -29,20 +29,12 @@
 
 typedef struct LmOldSocketPriv LmOldSocketPriv;
 struct LmOldSocketPriv {
-    gint my_prop;
+    gint fd;
 };
 
 static void     old_socket_iface_init           (LmSocketIface     *iface);
 static void     old_socket_transport_iface_init (LmTransportIface  *iface);
 static void     old_socket_finalize             (GObject           *object);
-static void     old_socket_get_property         (GObject           *object,
-                                                 guint              param_id,
-                                                 GValue            *value,
-                                                 GParamSpec        *pspec);
-static void     old_socket_set_property         (GObject           *object,
-                                                 guint              param_id,
-                                                 const GValue      *value,
-                                                 GParamSpec        *pspec);
 static void     old_socket_connect              (LmSocket          *socket,
                                                  struct addrinfo   *addresses,
                                                  int                port);
@@ -65,45 +57,13 @@ G_DEFINE_TYPE_WITH_CODE (LmOldSocket, lm_old_socket, G_TYPE_OBJECT,
                                                 old_socket_transport_iface_init);
                          })
 
-enum {
-    PROP_0,
-    PROP_MY_PROP
-};
-
-enum {
-    SIGNAL_NAME,
-    LAST_SIGNAL
-};
-
-static guint signals[LAST_SIGNAL] = { 0 };
-
 static void
 lm_old_socket_class_init (LmOldSocketClass *class)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (class);
 
     object_class->finalize     = old_socket_finalize;
-    object_class->get_property = old_socket_get_property;
-    object_class->set_property = old_socket_set_property;
 
-    g_object_class_install_property (object_class,
-                                     PROP_MY_PROP,
-                                     g_param_spec_string ("my-prop",
-                                                          "My Prop",
-                                                          "My Property",
-                                                          NULL,
-                                                          G_PARAM_READWRITE));
-    
-    signals[SIGNAL_NAME] = 
-        g_signal_new ("signal-name",
-                      G_OBJECT_CLASS_TYPE (object_class),
-                      G_SIGNAL_RUN_LAST,
-                      0,
-                      NULL, NULL,
-                      _lm_marshal_VOID__INT,
-                      G_TYPE_NONE, 
-                      1, G_TYPE_INT);
-    
     g_type_class_add_private (object_class, sizeof (LmOldSocketPriv));
 }
 
@@ -113,7 +73,6 @@ lm_old_socket_init (LmOldSocket *old_socket)
     LmOldSocketPriv *priv;
 
     priv = GET_PRIV (old_socket);
-
 }
 
 static void
@@ -139,46 +98,6 @@ old_socket_finalize (GObject *object)
     priv = GET_PRIV (object);
 
     (G_OBJECT_CLASS (lm_old_socket_parent_class)->finalize) (object);
-}
-
-static void
-old_socket_get_property (GObject    *object,
-                    guint       param_id,
-                    GValue     *value,
-                    GParamSpec *pspec)
-{
-    LmOldSocketPriv *priv;
-
-    priv = GET_PRIV (object);
-
-    switch (param_id) {
-    case PROP_MY_PROP:
-        g_value_set_int (value, priv->my_prop);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
-        break;
-    };
-}
-
-static void
-old_socket_set_property (GObject      *object,
-                    guint         param_id,
-                    const GValue *value,
-                    GParamSpec   *pspec)
-{
-    LmOldSocketPriv *priv;
-
-    priv = GET_PRIV (object);
-
-    switch (param_id) {
-    case PROP_MY_PROP:
-        priv->my_prop = g_value_get_int (value);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
-        break;
-    };
 }
 
 static void

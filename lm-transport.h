@@ -48,6 +48,17 @@ struct _LmTransportIface {
     void      (*disconnect) (LmTransport *transport);
 };
 
+/* Should remain in lm-connection.h */
+typedef enum {
+    LM_DISCONNECT_REASON_OK,
+    LM_DISCONNECT_REASON_PING_TIME_OUT,
+    LM_DISCONNECT_REASON_HUP,
+    LM_DISCONNECT_REASON_ERROR,
+    LM_DISCONNECT_REASON_RESOURCE_CONFLICT,
+    LM_DISCONNECT_REASON_INVALID_XML,
+    LM_DISCONNECT_REASON_UNKNOWN
+} LmDisconnectReason;
+
 GType          lm_transport_get_type          (void);
 
 int            lm_transport_get_handle        (LmTransport *transport);

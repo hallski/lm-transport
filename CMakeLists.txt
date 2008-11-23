@@ -21,6 +21,8 @@ set(SOURCES
 	lm-idummy.h
 	lm-marshal.c
 	lm-marshal.h
+	lm-old-socket.c
+	lm-old-socket.h
 	lm-socket.c
 	lm-socket.h
 	lm-transport.c

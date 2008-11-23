@@ -1,0 +1,9 @@
+Makefile
+*.o
+config.h
+cmake_install.cmake
+install_manifest.txt
+CMakeFiles
+CMakeCache.txt
+lm-marshal.[ch]
+test

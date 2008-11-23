@@ -21,6 +21,8 @@ set(SOURCES
 	lm-idummy.h
 	lm-marshal.c
 	lm-marshal.h
+	lm-transport.c
+	lm-transport.h
 )
 
 add_executable(test test.c ${SOURCES})

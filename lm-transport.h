@@ -37,12 +37,30 @@ struct _LmTransportIface {
     GTypeInterface parent;
 
     /* <vtable> */
-    int     (*function)      (LmTransport *transport);
+    int       (*get_handle) (LmTransport *transport);
+    GIOError  (*read)       (LmTransport *transport,
+                             void        *buf,
+                             gsize        len,
+                             gsize       *bytes_read);
+    void      (*write)      (LmTransport *transport,
+                             void        *buf,
+                             gsize        len);
+    void      (*disconnect) (LmTransport *transport);
 };
 
 GType          lm_transport_get_type          (void);
 
-gint           lm_transport_function          (LmTransport *transport);
+int            lm_transport_get_handle        (LmTransport *transport);
+GIOError       lm_transport_read              (LmTransport *transport,
+                                               void        *buf,
+                                               gsize        len,
+                                               gsize       *bytes_read);
+
+void           lm_transport_write             (LmTransport *transport,
+                                               void        *buf,
+                                               gsize        len);
+
+void           lm_transport_disconnect        (LmTransport *transport);
 
 G_END_DECLS
 

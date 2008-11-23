@@ -27,6 +27,7 @@ static void    transport_base_init (LmTransportIface *iface);
 
 enum {
     READABLE,
+    DISCONNECTED,
     LAST_SIGNAL
 };
 
@@ -70,19 +71,69 @@ transport_base_init (LmTransportIface *iface)
                           _lm_marshal_VOID__VOID,
                           G_TYPE_NONE,
                           0);
+        signals[DISCONNECTED] =
+            g_signal_new ("disconnected",
+                          LM_TYPE_TRANSPORT,
+                          G_SIGNAL_RUN_LAST,
+                          0,
+                          NULL, NULL,
+                          _lm_marshal_VOID__INT,
+                          G_TYPE_NONE,
+                          1, G_TYPE_INT);
         initialized = TRUE;
     }
 }
 
 int
-lm_transport_function (LmTransport *transport)
+lm_transport_get_handle (LmTransport *transport)
 {
-    g_return_val_if_fail (LM_IS_TRANSPORT (transport), FALSE);
+    g_return_val_if_fail (LM_IS_TRANSPORT (transport), -1);
 
-    if (!LM_TRANSPORT_GET_IFACE(transport)->function) {
+    if (!LM_TRANSPORT_GET_IFACE(transport)->get_handle) {
         g_assert_not_reached ();
     }
 
-    return LM_TRANSPORT_GET_IFACE(transport)->function (transport);
+    return LM_TRANSPORT_GET_IFACE(transport)->get_handle (transport);
 }
 
+GIOError
+lm_transport_read (LmTransport *transport,
+                   void        *buf,
+                   gsize        len,
+                   gsize       *bytes_read)
+{
+    g_return_val_if_fail (LM_IS_TRANSPORT (transport), G_IO_ERROR_UNKNOWN);
+
+    if (!LM_TRANSPORT_GET_IFACE(transport)->read) {
+        g_assert_not_reached ();
+    }
+
+    return LM_TRANSPORT_GET_IFACE(transport)->read (transport, buf, len, 
+                                                    bytes_read);
+}
+
+void
+lm_transport_write (LmTransport *transport,
+                    void        *buf,
+                    gsize        len)
+{
+    g_return_if_fail (LM_IS_TRANSPORT (transport));
+
+    if (!LM_TRANSPORT_GET_IFACE(transport)->write) {
+        g_assert_not_reached ();
+    }
+
+    return LM_TRANSPORT_GET_IFACE(transport)->write (transport, buf, len);
+}
+
+void
+lm_transport_disconnect (LmTransport *transport)
+{
+    g_return_if_fail (LM_IS_TRANSPORT (transport));
+
+    if (!LM_TRANSPORT_GET_IFACE(transport)->disconnect) {
+        g_assert_not_reached ();
+    }
+
+    return LM_TRANSPORT_GET_IFACE(transport)->disconnect (transport);
+}

@@ -17,6 +17,8 @@ pkg_check_modules(LM REQUIRED
 set(SOURCES
 	lm-dummy.c
 	lm-dummy.h
+	lm-idummy.c
+	lm-idummy.h
 	lm-marshal.c
 	lm-marshal.h
 )

@@ -84,6 +84,12 @@ socket_base_init (LmSocketIface *iface)
     }
 }
 
+LmSocket *
+lm_socket_create (void)
+{
+    return NULL;
+}
+
 void
 lm_socket_connect (LmSocket        *socket,
                    struct addrinfo *addresses,
@@ -97,4 +103,5 @@ lm_socket_connect (LmSocket        *socket,
 
     return LM_SOCKET_GET_IFACE(socket)->connect (socket, addresses, port);
 }
+
 

@@ -44,6 +44,7 @@ struct _LmSocketIface {
 };
 
 GType          lm_socket_get_type          (void);
+LmSocket *     lm_socket_create            (void); /* Factory method */
 
 void           lm_socket_connect           (LmSocket        *socket,
                                             struct addrinfo *addresses,

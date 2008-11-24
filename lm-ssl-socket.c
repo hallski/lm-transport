@@ -21,26 +21,26 @@
 #include <config.h>
 
 #include "lm-marshal.h"
-#include "lm-socket.h"
+#include "lm-ssl-socket.h"
 
-#define GET_PRIV(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), LM_TYPE_SOCKET, LmSocketPriv))
+#define GET_PRIV(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), LM_TYPE_SSL_SOCKET, LmSSLSocketPriv))
 
-typedef struct LmSocketPriv LmSocketPriv;
-struct LmSocketPriv {
+typedef struct LmSSLSocketPriv LmSSLSocketPriv;
+struct LmSSLSocketPriv {
     gint my_prop;
 };
 
-static void     socket_finalize            (GObject           *object);
-static void     socket_get_property        (GObject           *object,
+static void     ssl_socket_finalize            (GObject           *object);
+static void     ssl_socket_get_property        (GObject           *object,
                                            guint              param_id,
                                            GValue            *value,
                                            GParamSpec        *pspec);
-static void     socket_set_property        (GObject           *object,
+static void     ssl_socket_set_property        (GObject           *object,
                                            guint              param_id,
                                            const GValue      *value,
                                            GParamSpec        *pspec);
 
-G_DEFINE_TYPE (LmSocket, lm_socket, G_TYPE_OBJECT)
+G_DEFINE_TYPE (LmSSLSocket, lm_ssl_socket, G_TYPE_OBJECT)
 
 enum {
     PROP_0,
@@ -55,13 +55,13 @@ enum {
 static guint signals[LAST_SIGNAL] = { 0 };
 
 static void
-lm_socket_class_init (LmSocketClass *class)
+lm_ssl_socket_class_init (LmSSLSocketClass *class)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (class);
 
-    object_class->finalize     = socket_finalize;
-    object_class->get_property = socket_get_property;
-    object_class->set_property = socket_set_property;
+    object_class->finalize     = ssl_socket_finalize;
+    object_class->get_property = ssl_socket_get_property;
+    object_class->set_property = ssl_socket_set_property;
 
     g_object_class_install_property (object_class,
                                      PROP_MY_PROP,
@@ -81,35 +81,35 @@ lm_socket_class_init (LmSocketClass *class)
                       G_TYPE_NONE, 
                       1, G_TYPE_INT);
     
-    g_type_class_add_private (object_class, sizeof (LmSocketPriv));
+    g_type_class_add_private (object_class, sizeof (LmSSLSocketPriv));
 }
 
 static void
-lm_socket_init (LmSocket *socket)
+lm_ssl_socket_init (LmSSLSocket *ssl_socket)
 {
-    LmSocketPriv *priv;
+    LmSSLSocketPriv *priv;
 
-    priv = GET_PRIV (socket);
+    priv = GET_PRIV (ssl_socket);
 
 }
 
 static void
-socket_finalize (GObject *object)
+ssl_socket_finalize (GObject *object)
 {
-    LmSocketPriv *priv;
+    LmSSLSocketPriv *priv;
 
     priv = GET_PRIV (object);
 
-    (G_OBJECT_CLASS (lm_socket_parent_class)->finalize) (object);
+    (G_OBJECT_CLASS (lm_ssl_socket_parent_class)->finalize) (object);
 }
 
 static void
-socket_get_property (GObject    *object,
+ssl_socket_get_property (GObject    *object,
                     guint       param_id,
                     GValue     *value,
                     GParamSpec *pspec)
 {
-    LmSocketPriv *priv;
+    LmSSLSocketPriv *priv;
 
     priv = GET_PRIV (object);
 
@@ -124,12 +124,12 @@ socket_get_property (GObject    *object,
 }
 
 static void
-socket_set_property (GObject      *object,
+ssl_socket_set_property (GObject      *object,
                     guint         param_id,
                     const GValue *value,
                     GParamSpec   *pspec)
 {
-    LmSocketPriv *priv;
+    LmSSLSocketPriv *priv;
 
     priv = GET_PRIV (object);
 

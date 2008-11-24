@@ -18,47 +18,42 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#ifndef __LM_SOCKET_H__
-#define __LM_SOCKET_H__
+#ifndef __LM_SSL_SOCKET_H__
+#define __LM_SSL_SOCKET_H__
 
 #include <glib-object.h>
 
-#include "lm-socket-address.h"
-
 G_BEGIN_DECLS
 
-#define LM_TYPE_SOCKET            (lm_socket_get_type ())
-#define LM_SOCKET(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), LM_TYPE_SOCKET, LmSocket))
-#define LM_SOCKET_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), LM_TYPE_SOCKET, LmSocketClass))
-#define LM_IS_SOCKET(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), LM_TYPE_SOCKET))
-#define LM_IS_SOCKET_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), LM_TYPE_SOCKET))
-#define LM_SOCKET_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), LM_TYPE_SOCKET, LmSocketClass))
+#define LM_TYPE_SSL_SOCKET            (lm_ssl_socket_get_type ())
+#define LM_SSL_SOCKET(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), LM_TYPE_SSL_SOCKET, LmSSLSocket))
+#define LM_SSL_SOCKET_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), LM_TYPE_SSL_SOCKET, LmSSLSocketClass))
+#define LM_IS_SSL_SOCKET(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), LM_TYPE_SSL_SOCKET))
+#define LM_IS_SSL_SOCKET_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), LM_TYPE_SSL_SOCKET))
+#define LM_SSL_SOCKET_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), LM_TYPE_SSL_SOCKET, LmSSLSocketClass))
 
-typedef struct LmSocket      LmSocket;
-typedef struct LmSocketClass LmSocketClass;
+typedef struct LmSSLSocket      LmSSLSocket;
+typedef struct LmSSLSocketClass LmSSLSocketClass;
 
-struct LmSocket {
+struct LmSSLSocket {
     GObject parent;
 };
 
-struct LmSocketClass {
+struct LmSSLSocketClass {
     GObjectClass parent_class;
     
     /* <vtable> */
-    void  (*initialize)    (LmSocket     *socket,
+    void  (*initialize)    (LmSSLSocket     *ssl_socket,
                             const char *username,
                             const char *server,
                             const char *password);
-    void  (*begin)         (LmSocket     *socket);
-    void  (*cancel)        (LmSocket     *socket);
+    void  (*begin)         (LmSSLSocket     *ssl_socket);
+    void  (*cancel)        (LmSSLSocket     *ssl_socket);
 };
 
-GType      lm_socket_get_type  (void);
+GType   lm_ssl_socket_get_type  (void);
 
-LmSocket * lm_socket_new            (LmSocketAddress *address);
-LmSocket * lm_socket_new_with_proxy (LmSocketAddress *address); /* Proxy */
-                                     
 G_END_DECLS
 
-#endif /* __LM_SOCKET_H__ */
+#endif /* __LM_SSL_SOCKET_H__ */
 

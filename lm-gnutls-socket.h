@@ -18,47 +18,42 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#ifndef __LM_SOCKET_H__
-#define __LM_SOCKET_H__
+#ifndef __LM_GNUTLS_SOCKET_H__
+#define __LM_GNUTLS_SOCKET_H__
 
 #include <glib-object.h>
 
-#include "lm-socket-address.h"
-
 G_BEGIN_DECLS
 
-#define LM_TYPE_SOCKET            (lm_socket_get_type ())
-#define LM_SOCKET(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), LM_TYPE_SOCKET, LmSocket))
-#define LM_SOCKET_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), LM_TYPE_SOCKET, LmSocketClass))
-#define LM_IS_SOCKET(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), LM_TYPE_SOCKET))
-#define LM_IS_SOCKET_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), LM_TYPE_SOCKET))
-#define LM_SOCKET_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), LM_TYPE_SOCKET, LmSocketClass))
+#define LM_TYPE_GNUTLS_SOCKET            (lm_gnutls_socket_get_type ())
+#define LM_GNUTLS_SOCKET(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), LM_TYPE_GNUTLS_SOCKET, LmGnuTLSSocket))
+#define LM_GNUTLS_SOCKET_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), LM_TYPE_GNUTLS_SOCKET, LmGnuTLSSocketClass))
+#define LM_IS_GNUTLS_SOCKET(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), LM_TYPE_GNUTLS_SOCKET))
+#define LM_IS_GNUTLS_SOCKET_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), LM_TYPE_GNUTLS_SOCKET))
+#define LM_GNUTLS_SOCKET_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), LM_TYPE_GNUTLS_SOCKET, LmGnuTLSSocketClass))
 
-typedef struct LmSocket      LmSocket;
-typedef struct LmSocketClass LmSocketClass;
+typedef struct LmGnuTLSSocket      LmGnuTLSSocket;
+typedef struct LmGnuTLSSocketClass LmGnuTLSSocketClass;
 
-struct LmSocket {
+struct LmGnuTLSSocket {
     GObject parent;
 };
 
-struct LmSocketClass {
+struct LmGnuTLSSocketClass {
     GObjectClass parent_class;
     
     /* <vtable> */
-    void  (*initialize)    (LmSocket     *socket,
+    void  (*initialize)    (LmGnuTLSSocket     *gnutls_socket,
                             const char *username,
                             const char *server,
                             const char *password);
-    void  (*begin)         (LmSocket     *socket);
-    void  (*cancel)        (LmSocket     *socket);
+    void  (*begin)         (LmGnuTLSSocket     *gnutls_socket);
+    void  (*cancel)        (LmGnuTLSSocket     *gnutls_socket);
 };
 
-GType      lm_socket_get_type  (void);
+GType   lm_gnutls_socket_get_type  (void);
 
-LmSocket * lm_socket_new            (LmSocketAddress *address);
-LmSocket * lm_socket_new_with_proxy (LmSocketAddress *address); /* Proxy */
-                                     
 G_END_DECLS
 
-#endif /* __LM_SOCKET_H__ */
+#endif /* __LM_GNUTLS_SOCKET_H__ */
 

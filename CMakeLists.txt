@@ -15,8 +15,6 @@ pkg_check_modules(LM REQUIRED
 	gobject-2.0)
 
 set(SOURCES
-	lm-debug.c
-	lm-debug.h
 	lm-dummy.c
 	lm-dummy.h
 	lm-idummy.c
@@ -25,14 +23,15 @@ set(SOURCES
 	lm-marshal.h
 	lm-misc.c
 	lm-misc.h
-	lm-old-socket.c
-	lm-old-socket.h
-	lm-sock.c
-	lm-sock.h
 	lm-socket.c
 	lm-socket.h
-	lm-transport.c
-	lm-transport.h
+	lm-socket-address.c
+	lm-socket-address.h
+	lm-ssl-socket.c
+	lm-ssl-socket.h
+	lm-gnutls-socket.c
+	lm-openssl-socket.c
+	lm-openssl-socket.h
 )
 
 add_executable(test test.c ${SOURCES})

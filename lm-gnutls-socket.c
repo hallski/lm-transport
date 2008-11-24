@@ -21,26 +21,26 @@
 #include <config.h>
 
 #include "lm-marshal.h"
-#include "lm-socket.h"
+#include "lm-gnutls-socket.h"
 
-#define GET_PRIV(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), LM_TYPE_SOCKET, LmSocketPriv))
+#define GET_PRIV(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), LM_TYPE_GNUTLS_SOCKET, LmGnuTLSSocketPriv))
 
-typedef struct LmSocketPriv LmSocketPriv;
-struct LmSocketPriv {
+typedef struct LmGnuTLSSocketPriv LmGnuTLSSocketPriv;
+struct LmGnuTLSSocketPriv {
     gint my_prop;
 };
 
-static void     socket_finalize            (GObject           *object);
-static void     socket_get_property        (GObject           *object,
+static void     gnutls_socket_finalize            (GObject           *object);
+static void     gnutls_socket_get_property        (GObject           *object,
                                            guint              param_id,
                                            GValue            *value,
                                            GParamSpec        *pspec);
-static void     socket_set_property        (GObject           *object,
+static void     gnutls_socket_set_property        (GObject           *object,
                                            guint              param_id,
                                            const GValue      *value,
                                            GParamSpec        *pspec);
 
-G_DEFINE_TYPE (LmSocket, lm_socket, G_TYPE_OBJECT)
+G_DEFINE_TYPE (LmGnuTLSSocket, lm_gnutls_socket, G_TYPE_OBJECT)
 
 enum {
     PROP_0,
@@ -55,13 +55,13 @@ enum {
 static guint signals[LAST_SIGNAL] = { 0 };
 
 static void
-lm_socket_class_init (LmSocketClass *class)
+lm_gnutls_socket_class_init (LmGnuTLSSocketClass *class)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (class);
 
-    object_class->finalize     = socket_finalize;
-    object_class->get_property = socket_get_property;
-    object_class->set_property = socket_set_property;
+    object_class->finalize     = gnutls_socket_finalize;
+    object_class->get_property = gnutls_socket_get_property;
+    object_class->set_property = gnutls_socket_set_property;
 
     g_object_class_install_property (object_class,
                                      PROP_MY_PROP,
@@ -81,35 +81,35 @@ lm_socket_class_init (LmSocketClass *class)
                       G_TYPE_NONE, 
                       1, G_TYPE_INT);
     
-    g_type_class_add_private (object_class, sizeof (LmSocketPriv));
+    g_type_class_add_private (object_class, sizeof (LmGnuTLSSocketPriv));
 }
 
 static void
-lm_socket_init (LmSocket *socket)
+lm_gnutls_socket_init (LmGnuTLSSocket *gnutls_socket)
 {
-    LmSocketPriv *priv;
+    LmGnuTLSSocketPriv *priv;
 
-    priv = GET_PRIV (socket);
+    priv = GET_PRIV (gnutls_socket);
 
 }
 
 static void
-socket_finalize (GObject *object)
+gnutls_socket_finalize (GObject *object)
 {
-    LmSocketPriv *priv;
+    LmGnuTLSSocketPriv *priv;
 
     priv = GET_PRIV (object);
 
-    (G_OBJECT_CLASS (lm_socket_parent_class)->finalize) (object);
+    (G_OBJECT_CLASS (lm_gnutls_socket_parent_class)->finalize) (object);
 }
 
 static void
-socket_get_property (GObject    *object,
+gnutls_socket_get_property (GObject    *object,
                     guint       param_id,
                     GValue     *value,
                     GParamSpec *pspec)
 {
-    LmSocketPriv *priv;
+    LmGnuTLSSocketPriv *priv;
 
     priv = GET_PRIV (object);
 
@@ -124,12 +124,12 @@ socket_get_property (GObject    *object,
 }
 
 static void
-socket_set_property (GObject      *object,
+gnutls_socket_set_property (GObject      *object,
                     guint         param_id,
                     const GValue *value,
                     GParamSpec   *pspec)
 {
-    LmSocketPriv *priv;
+    LmGnuTLSSocketPriv *priv;
 
     priv = GET_PRIV (object);
 

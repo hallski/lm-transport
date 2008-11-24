@@ -22,6 +22,14 @@
 
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+
+#ifdef G_OS_WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#endif /* G_OS_WIN32 */
 
 #include "asyncns.h"
 #include "lm-marshal.h"
@@ -44,10 +52,15 @@ struct LmSocketPriv {
     SocketHandle     handle;
     GIOChannel      *io_channel;
 
+    /* DNS Lookup */
     asyncns_t       *asyncns_ctx;
     asyncns_query_t *asyncns_query;
     GSource         *resolve_watch;
     GIOChannel      *resolve_channel;
+
+    /* Connect */
+    LmSocketAddressIter *sa_iter;
+    GSource             *connect_watch;
 
     gint             my_prop;
 };
@@ -79,6 +92,9 @@ static gboolean  socket_resolver_io_cb      (GSource           *source,
                                              GIOCondition       condition,
                                              LmSocket          *socket);
 static void      socket_resolved_connect    (LmSocket          *socket);
+static gboolean  socket_connect_cb          (GIOChannel        *channel,
+                                             GIOCondition       condition,
+                                             LmSocket          *socket);
 
 G_DEFINE_TYPE (LmSocket, lm_socket, G_TYPE_OBJECT)
 
@@ -394,17 +410,103 @@ socket_resolver_io_cb (GSource      *source,
     socket_cleanup_resolver (socket);
 
     if (ret_val) {
+        priv->sa_iter = lm_socket_address_get_result_iter (priv->sa);
         socket_resolved_connect (socket);
     }
 
     return ret_val;
 }
 
+#ifndef G_OS_WIN32
+  #define LM_SOCKET_FD_VALID(s) ((s) >= 0)
+#else 
+  #define LM_SOCKET_FD_VALID(s) ((s) != INVALID_SOCKET)
+#endif /* G_OS_WIN32 */
+
 static void
-socket_resolved_connect (LmSocket *socket)
+socket_set_fd_blocking (SocketHandle handle, gboolean block)
 {
-    /* */
+    int res;
+
+#ifndef G_OS_WIN32
+    res = fcntl (handle, F_SETFL, block ? 0 : O_NONBLOCK);
+#else  /* G_OS_WIN32 */
+    u_long mode = (block ? 0 : 1);
+    res = ioctlsocket (handle, FIONBIO, &mode);
+#endif /* G_OS_WIN32 */
+
+    if (res != 0) {
+        g_warning ("Could not set connection to be %s\n",
+                   block ? "blocking" : "non-blocking");
+    }
 }
+
+static void
+socket_resolved_connect (LmSocket *sock)
+{
+    LmSocketPriv    *priv;
+    int              res;
+    struct addrinfo *addr;
+    char             name[NI_MAXHOST];
+    char             portname[NI_MAXSERV];
+
+    priv = GET_PRIV (sock);
+
+    addr = lm_socket_address_iter_get_next (priv->sa_iter);
+    if (!addr) {
+        g_warning ("Failed to connect, phase 0");
+        return;
+    }
+
+    res = getnameinfo (addr->ai_addr,
+                       (socklen_t)addr->ai_addrlen,
+                       name, sizeof (name),
+                       portname, sizeof (portname),
+                       NI_NUMERICHOST | NI_NUMERICSERV);
+    if (res < 0) {
+        g_warning ("Failed to connect, phase 1");
+        return;
+    }
+
+    priv->handle = (SocketHandle)socket (addr->ai_family, 
+                                         addr->ai_socktype, 
+                                         addr->ai_protocol);
+
+    if (!LM_SOCKET_FD_VALID(priv->handle)) {
+        g_warning ("Failed to connect, phase 2");
+        return;
+    }
+
+    priv->io_channel = g_io_channel_unix_new (priv->handle);
+
+    g_io_channel_set_encoding (priv->io_channel, NULL, NULL);
+    g_io_channel_set_buffered (priv->io_channel, FALSE);
+
+    socket_set_fd_blocking (priv->handle, FALSE);
+
+    priv->connect_watch = lm_misc_add_io_watch (priv->context,
+                                                priv->io_channel,
+                                                G_IO_OUT | G_IO_ERR,
+                                                (GIOFunc) socket_connect_cb,
+                                                socket);
+
+    res = connect (priv->handle, addr->ai_addr, (int)addr->ai_addrlen);
+    if (res < 0) {
+        g_warning ("Failed to connect, phase 3 (lm-old-socket.c:662)");
+        return;
+    }
+
+    /* TODO: Add a timeout here? */
+}
+
+static gboolean
+socket_connect_cb (GIOChannel   *channel,
+                   GIOCondition  condition,
+                   LmSocket     *socket)
+{
+    return FALSE;
+}
+
 
 /* -- Public API -- */
 LmSocket * 

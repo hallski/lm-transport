@@ -59,6 +59,12 @@ lm_socket_address_get_port (LmSocketAddress *sa)
     return sa->port;
 }
 
+gboolean 
+lm_socket_address_is_resolved (LmSocketAddress *sa)
+{
+    return (sa->results != NULL);
+}
+
 LmSocketAddress *
 lm_socket_address_ref (LmSocketAddress *sa)
 {

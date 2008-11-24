@@ -65,6 +65,9 @@ static GIOStatus socket_do_write            (LmSocket          *socket,
                                              gsize              len,
                                              gsize             *written_len,
                                              GError           **error);
+static void 
+socket_resolve_address_and_connect          (LmSocket          *socket);
+static void      socket_resolved_connect    (LmSocket          *socket);
 
 G_DEFINE_TYPE (LmSocket, lm_socket, G_TYPE_OBJECT)
 
@@ -186,9 +189,9 @@ socket_finalize (GObject *object)
 
 static void
 socket_get_property (GObject    *object,
-                    guint       param_id,
-                    GValue     *value,
-                    GParamSpec *pspec)
+                     guint       param_id,
+                     GValue     *value,
+                     GParamSpec *pspec)
 {
     LmSocketPriv *priv;
 
@@ -209,9 +212,9 @@ socket_get_property (GObject    *object,
 
 static void
 socket_set_property (GObject      *object,
-                    guint         param_id,
-                    const GValue *value,
-                    GParamSpec   *pspec)
+                     guint         param_id,
+                     const GValue *value,
+                     GParamSpec   *pspec)
 {
     LmSocketPriv *priv;
 
@@ -234,7 +237,13 @@ socket_set_property (GObject      *object,
 static void
 socket_do_connect (LmSocket *socket)
 {
-    /* Do all the cruft involved */
+    LmSocketPriv *priv;
+
+    if (!lm_socket_address_is_resolved (priv->sa)) {
+        socket_resolve_address_and_connect (socket);
+    }
+
+    socket_resolved_connect (socket);
 }
 
 static void
@@ -281,6 +290,15 @@ socket_do_write (LmSocket  *socket,
                                      buf, len, written_len, error);
 }
 
+static void
+socket_resolve_address_and_connect (LmSocket *socket)
+{}
+
+static void
+socket_resolved_connect (LmSocket *socket)
+{}
+
+/* -- Public API -- */
 LmSocket * 
 lm_socket_new (LmSocketAddress *address, GMainContext *context)
 {

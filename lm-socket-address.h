@@ -23,7 +23,7 @@ LmSocketAddress * lm_socket_address_new      (const gchar     *hostname,
 const gchar *     lm_socket_address_get_host (LmSocketAddress *sa);
 guint             lm_socket_address_get_port (LmSocketAddress *sa);
 
-gboolean          lm_socket_is_resolved      (LmSocketAddress *sa);
+gboolean          lm_socket_address_is_resolved (LmSocketAddress *sa);
 
 LmInetAddress *   lm_socket_address_get_inet_address   (LmSocketAddress *sa);
 GSList *          lm_socket_address_get_inet_addresses (LmSocketAddress *sa);

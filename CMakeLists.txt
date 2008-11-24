@@ -15,6 +15,8 @@ pkg_check_modules(LM REQUIRED
 	gobject-2.0)
 
 set(SOURCES
+	asyncns.c
+	asyncns.h
 	lm-dummy.c
 	lm-dummy.h
 	lm-idummy.c
@@ -35,7 +37,7 @@ set(SOURCES
 )
 
 add_executable(test test.c ${SOURCES})
-target_link_libraries(test ${LM_LIBRARIES})
+target_link_libraries(test ${LM_LIBRARIES} 'resolv')
 
 include_directories("." ${LM_INCLUDE_DIRS})
 link_directories(${LM_LIBRARY_DIRS})

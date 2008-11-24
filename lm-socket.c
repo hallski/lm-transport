@@ -20,8 +20,16 @@
 
 #include <config.h>
 
+#include <unistd.h>
+
 #include "lm-marshal.h"
 #include "lm-socket.h"
+
+#ifndef G_OS_WIN32
+typedef int SocketHandle;
+#else  /* G_OS_WIN32 */
+typedef SOCKET SocketHandle;
+#endif /* G_OS_WIN32 */
 
 #define GET_PRIV(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), LM_TYPE_SOCKET, LmSocketPriv))
 
@@ -30,6 +38,7 @@ struct LmSocketPriv {
     GMainContext    *context;
     LmSocketAddress *sa;
 
+    SocketHandle     handle;
     GIOChannel      *io_channel;
 
     gint             my_prop;
@@ -133,7 +142,6 @@ lm_socket_class_init (LmSocketClass *class)
                       _lm_marshal_VOID__INT,
                       G_TYPE_NONE, 
                       1, G_TYPE_INT);
-    
     signals[ERROR] = 
         g_signal_new ("error",
                       G_OBJECT_CLASS_TYPE (object_class),
@@ -153,7 +161,6 @@ lm_socket_init (LmSocket *socket)
     LmSocketPriv *priv;
 
     priv = GET_PRIV (socket);
-
 }
 
 static void
@@ -213,11 +220,21 @@ socket_set_property (GObject      *object,
 static void
 socket_do_connect (LmSocket *socket)
 {
+    /* Do all the cruft involved */
 }
 
 static void
 socket_do_close (LmSocket *socket)
 {
+    LmSocketPriv *priv;
+
+    priv = GET_PRIV (socket);
+
+#ifndef G_OS_WIN32
+    close (priv->handle);
+#else  /* G_OS_WIN32 */
+    closesocket (priv->handle);
+#endif /* G_OS_WIN32 */
 }
 
 static GIOStatus

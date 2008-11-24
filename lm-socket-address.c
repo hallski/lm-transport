@@ -102,18 +102,6 @@ struct LmInetAddress {
     guint            ref_count;
 };
 
-LmInetAddress *
-lm_inet_address_new (struct addrinfo *ai)
-{
-    LmInetAddress *ia;
-    
-    ia = g_slice_new0 (LmInetAddress);
-    ia->ai = ai; /* Copy it */
-    ia->ref_count = 1;
-
-    return ia;
-}
-
 struct addrinfo *
 lm_inet_address_get_addrinfo (LmInetAddress *ia)
 {
@@ -137,6 +125,24 @@ lm_inet_address_unref (LmInetAddress *ia)
         /* Free addrinfo */
         g_slice_free (LmInetAddress, ia);
     }
+}
+
+void
+lm_socket_address_set_results (LmSocketAddress *sa, struct addrinfo *ai)
+{
+    /* Create LmInetAddresses and set them in a results list */
+}
+
+LmInetAddress *
+lm_inet_address_new (struct addrinfo *ai)
+{
+    LmInetAddress *ia;
+    
+    ia = g_slice_new0 (LmInetAddress);
+    ia->ai = ai; /* Copy it */
+    ia->ref_count = 1;
+
+    return ia;
 }
 
 

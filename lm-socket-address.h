@@ -10,12 +10,15 @@
 
 G_BEGIN_DECLS
 
+#define LM_TYPE_INET_ADDRESS   (lm_inet_address_get_type ())
+#define LM_TYPE_SOCKET_ADDRESS (lm_socket_address_get_type ())
+
 typedef struct LmInetAddress   LmInetAddress;
 typedef struct LmSocketAddress LmSocketAddress;
 
 GType             lm_socket_address_get_type (void);
 LmSocketAddress * lm_socket_address_new      (const gchar     *hostname,
-                                               guint            port);
+                                              guint            port);
 
 const gchar *     lm_socket_address_get_host (LmSocketAddress *sa);
 guint             lm_socket_address_get_port (LmSocketAddress *sa);
@@ -29,11 +32,16 @@ LmSocketAddress * lm_socket_address_ref      (LmSocketAddress *sa);
 void              lm_socket_address_unref    (LmSocketAddress *sa);
 
 GType             lm_inet_address_get_type     (void);
-/* Only to be used by the resolver */
-LmInetAddress *   lm_inet_address_new          (struct addrinfo *ai);
 struct addrinfo * lm_inet_address_get_addrinfo (LmInetAddress *ia);
 LmInetAddress *   lm_inet_address_ref          (LmInetAddress *ia);
 void              lm_inet_address_unref        (LmInetAddress *ia);
+
+
+/* Only to be used by the resolver */
+void              lm_socket_address_set_results (LmSocketAddress *sa,
+                                                 struct addrinfo *ai);
+LmInetAddress *   lm_inet_address_new           (struct addrinfo *ai);
+
 
 G_END_DECLS
 

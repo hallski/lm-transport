@@ -71,7 +71,7 @@ G_DEFINE_TYPE (LmSocket, lm_socket, G_TYPE_OBJECT)
 enum {
     PROP_0,
     PROP_CONTEXT,
-    PROP_MY_PROP
+    PROP_ADDRESS
 };
 
 enum {
@@ -105,6 +105,13 @@ lm_socket_class_init (LmSocketClass *class)
                                   "GMainContext to run this socket",
                                   G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
     g_object_class_install_property (object_class, PROP_CONTEXT, pspec);
+
+    pspec = g_param_spec_boxed ("address",
+                                "Socket address",
+                                "The socket address of the remote host",
+                                LM_TYPE_SOCKET_ADDRESS,
+                                G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_ADDRESS, pspec);
 
     signals[CONNECTED] = 
         g_signal_new ("connected",
@@ -188,11 +195,14 @@ socket_get_property (GObject    *object,
     priv = GET_PRIV (object);
 
     switch (param_id) {
-    case PROP_MY_PROP:
-        g_value_set_int (value, priv->my_prop);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
+        case PROP_CONTEXT:
+            g_value_set_pointer (value, priv->context);
+            break;
+        case PROP_ADDRESS:
+            g_value_set_boxed (value, priv->sa);
+            break;
+        default:
+            G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
         break;
     };
 }
@@ -208,8 +218,12 @@ socket_set_property (GObject      *object,
     priv = GET_PRIV (object);
 
     switch (param_id) {
-    case PROP_MY_PROP:
-        priv->my_prop = g_value_get_int (value);
+        case PROP_CONTEXT:
+            priv->context = g_main_context_ref (g_value_get_pointer (value));
+            break;
+        case PROP_ADDRESS:
+            priv->sa = g_value_get_boxed (value);
+            break;
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);

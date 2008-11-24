@@ -27,6 +27,8 @@
 
 typedef struct LmSocketPriv LmSocketPriv;
 struct LmSocketPriv {
+    LmSocketAddress *sa;
+
     gint my_prop;
 };
 
@@ -100,6 +102,10 @@ socket_finalize (GObject *object)
 
     priv = GET_PRIV (object);
 
+    if (priv->sa) {
+        lm_socket_address_unref (priv->sa);
+    }
+
     (G_OBJECT_CLASS (lm_socket_parent_class)->finalize) (object);
 }
 
@@ -141,5 +147,55 @@ socket_set_property (GObject      *object,
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
         break;
     };
+}
+
+LmSocket * 
+lm_socket_new (LmSocketAddress *address)
+{
+    LmSocket     *socket;
+    LmSocketPriv *priv;
+
+    socket = g_object_new (LM_TYPE_SOCKET, NULL);
+    priv   = GET_PRIV (socket);
+
+    priv->sa = lm_socket_address_ref (address);
+
+    return socket;
+}
+
+/* Support proxy here
+ * LmSocket * lm_socket_new_with_proxy (LmSocketAddress *address); 
+ */
+
+void
+lm_socket_connect (LmSocket *socket)
+{
+}
+
+void
+lm_socket_close (LmSocket *socket)
+{
+}
+
+GIOStatus
+lm_socket_read (LmSocket *socket,
+                gchar    *buf,
+                gsize     len,
+                gsize    *read_len)
+{
+    /* g_io_channel_read_chars (); */
+
+    return G_IO_STATUS_NORMAL;
+}
+
+GIOStatus
+lm_socket_write (LmSocket *socket,
+                 gchar    *buf,
+                 gsize     len,
+                 gsize    *written_len)
+{
+    /* g_io_channel_write_chars (); */
+
+    return G_IO_STATUS_NORMAL;
 }
 

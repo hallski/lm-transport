@@ -56,8 +56,21 @@ struct LmSocketClass {
 GType      lm_socket_get_type  (void);
 
 LmSocket * lm_socket_new            (LmSocketAddress *address);
-LmSocket * lm_socket_new_with_proxy (LmSocketAddress *address); /* Proxy */
-                                     
+/* Support proxy here
+ * LmSocket * lm_socket_new_with_proxy (LmSocketAddress *address); 
+ */
+
+void       lm_socket_connect        (LmSocket        *socket);
+void       lm_socket_close          (LmSocket        *socket);
+GIOStatus  lm_socket_read           (LmSocket        *socket,
+                                     gchar           *buf,
+                                     gsize            len,
+                                     gsize           *read_len);
+GIOStatus  lm_socket_write          (LmSocket        *socket,
+                                     gchar           *buf,
+                                     gsize            len,
+                                     gsize           *written_len);
+
 G_END_DECLS
 
 #endif /* __LM_SOCKET_H__ */

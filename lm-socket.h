@@ -45,17 +45,23 @@ struct LmSocketClass {
     GObjectClass parent_class;
     
     /* <vtable> */
-    void  (*initialize)    (LmSocket     *socket,
-                            const char *username,
-                            const char *server,
-                            const char *password);
-    void  (*begin)         (LmSocket     *socket);
-    void  (*cancel)        (LmSocket     *socket);
+    void       (*close)          (LmSocket        *socket);
+    GIOStatus  (*read)           (LmSocket        *socket,
+                                  gchar           *buf,
+                                  gsize            len,
+                                  gsize           *read_len,
+                                  GError         **error);
+    GIOStatus  (*write)          (LmSocket        *socket,
+                                  gchar           *buf,
+                                  gsize            len,
+                                  gsize           *written_len,
+                                  GError         **error);
 };
 
 GType      lm_socket_get_type  (void);
 
-LmSocket * lm_socket_new            (LmSocketAddress *address);
+LmSocket * lm_socket_new            (LmSocketAddress *address,
+                                     GMainContext    *context);
 /* Support proxy here
  * LmSocket * lm_socket_new_with_proxy (LmSocketAddress *address); 
  */
@@ -65,11 +71,13 @@ void       lm_socket_close          (LmSocket        *socket);
 GIOStatus  lm_socket_read           (LmSocket        *socket,
                                      gchar           *buf,
                                      gsize            len,
-                                     gsize           *read_len);
+                                     gsize           *read_len,
+                                     GError         **error);
 GIOStatus  lm_socket_write          (LmSocket        *socket,
                                      gchar           *buf,
                                      gsize            len,
-                                     gsize           *written_len);
+                                     gsize           *written_len,
+                                     GError         **error);
 
 G_END_DECLS
 

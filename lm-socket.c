@@ -27,30 +27,49 @@
 
 typedef struct LmSocketPriv LmSocketPriv;
 struct LmSocketPriv {
+    GMainContext    *context;
     LmSocketAddress *sa;
 
-    gint my_prop;
+    GIOChannel      *io_channel;
+
+    gint             my_prop;
 };
 
-static void     socket_finalize            (GObject           *object);
-static void     socket_get_property        (GObject           *object,
-                                           guint              param_id,
-                                           GValue            *value,
-                                           GParamSpec        *pspec);
-static void     socket_set_property        (GObject           *object,
-                                           guint              param_id,
-                                           const GValue      *value,
-                                           GParamSpec        *pspec);
+static void      socket_finalize            (GObject           *object);
+static void      socket_get_property        (GObject           *object,
+                                             guint              param_id,
+                                             GValue            *value,
+                                             GParamSpec        *pspec);
+static void      socket_set_property        (GObject           *object,
+                                             guint              param_id,
+                                             const GValue      *value,
+                                             GParamSpec        *pspec);
+static void      socket_do_close            (LmSocket          *socket);
+static GIOStatus socket_do_read             (LmSocket          *socket,
+                                             gchar             *buf,
+                                             gsize              len,
+                                             gsize             *read_len,
+                                             GError           **error);
+static GIOStatus socket_do_write            (LmSocket          *socket,
+                                             gchar             *buf,
+                                             gsize              len,
+                                             gsize             *written_len,
+                                             GError           **error);
 
 G_DEFINE_TYPE (LmSocket, lm_socket, G_TYPE_OBJECT)
 
 enum {
     PROP_0,
+    PROP_CONTEXT,
     PROP_MY_PROP
 };
 
 enum {
-    SIGNAL_NAME,
+    CONNECTED,
+    READABLE,
+    WRITABLE,
+    DISCONNECTED,
+    ERROR,
     LAST_SIGNAL
 };
 
@@ -60,21 +79,61 @@ static void
 lm_socket_class_init (LmSocketClass *class)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (class);
+    GParamSpec   *pspec;
+
+    class->close               = socket_do_close;
+    class->read                = socket_do_read;
+    class->write               = socket_do_write;
 
     object_class->finalize     = socket_finalize;
     object_class->get_property = socket_get_property;
     object_class->set_property = socket_set_property;
 
-    g_object_class_install_property (object_class,
-                                     PROP_MY_PROP,
-                                     g_param_spec_string ("my-prop",
-                                                          "My Prop",
-                                                          "My Property",
-                                                          NULL,
-                                                          G_PARAM_READWRITE));
+    pspec = g_param_spec_pointer ("context",
+                                  "Main context",
+                                  "GMainContext to run this socket",
+                                  G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_CONTEXT, pspec);
+
+    signals[CONNECTED] = 
+        g_signal_new ("connected",
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_LAST,
+                      0,
+                      NULL, NULL,
+                      _lm_marshal_VOID__INT,
+                      G_TYPE_NONE, 
+                      1, G_TYPE_INT);
+     signals[DISCONNECTED] = 
+        g_signal_new ("disconnected",
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_LAST,
+                      0,
+                      NULL, NULL,
+                      _lm_marshal_VOID__INT,
+                      G_TYPE_NONE, 
+                      1, G_TYPE_INT);
+     signals[READABLE] = 
+        g_signal_new ("readable",
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_LAST,
+                      0,
+                      NULL, NULL,
+                      _lm_marshal_VOID__INT,
+                      G_TYPE_NONE, 
+                      1, G_TYPE_INT);
+    signals[WRITABLE] = 
+        g_signal_new ("writable",
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_LAST,
+                      0,
+                      NULL, NULL,
+                      _lm_marshal_VOID__INT,
+                      G_TYPE_NONE, 
+                      1, G_TYPE_INT);
     
-    signals[SIGNAL_NAME] = 
-        g_signal_new ("signal-name",
+    signals[ERROR] = 
+        g_signal_new ("error",
                       G_OBJECT_CLASS_TYPE (object_class),
                       G_SIGNAL_RUN_LAST,
                       0,
@@ -149,13 +208,48 @@ socket_set_property (GObject      *object,
     };
 }
 
+static void
+socket_do_close (LmSocket *socket)
+{
+}
+
+static GIOStatus
+socket_do_read (LmSocket  *socket,
+                gchar     *buf,
+                gsize      len,
+                gsize     *read_len,
+                GError   **error)
+{
+    LmSocketPriv *priv;
+
+    priv = GET_PRIV (socket);
+
+    return g_io_channel_read_chars (priv->io_channel, 
+                                    buf, len, read_len, error);
+}
+
+static GIOStatus
+socket_do_write (LmSocket  *socket,
+                 gchar     *buf,
+                 gsize      len,
+                 gsize     *written_len,
+                 GError   **error)
+{
+    LmSocketPriv *priv;
+
+    priv = GET_PRIV (socket);
+
+    return g_io_channel_write_chars (priv->io_channel,
+                                     buf, len, written_len, error);
+}
+
 LmSocket * 
-lm_socket_new (LmSocketAddress *address)
+lm_socket_new (LmSocketAddress *address, GMainContext *context)
 {
     LmSocket     *socket;
     LmSocketPriv *priv;
 
-    socket = g_object_new (LM_TYPE_SOCKET, NULL);
+    socket = g_object_new (LM_TYPE_SOCKET, "context", context, NULL);
     priv   = GET_PRIV (socket);
 
     priv->sa = lm_socket_address_ref (address);
@@ -178,10 +272,11 @@ lm_socket_close (LmSocket *socket)
 }
 
 GIOStatus
-lm_socket_read (LmSocket *socket,
-                gchar    *buf,
-                gsize     len,
-                gsize    *read_len)
+lm_socket_read (LmSocket  *socket,
+                gchar     *buf,
+                gsize      len,
+                gsize     *read_len,
+                GError   **error)
 {
     /* g_io_channel_read_chars (); */
 
@@ -189,10 +284,11 @@ lm_socket_read (LmSocket *socket,
 }
 
 GIOStatus
-lm_socket_write (LmSocket *socket,
-                 gchar    *buf,
-                 gsize     len,
-                 gsize    *written_len)
+lm_socket_write (LmSocket  *socket,
+                 gchar     *buf,
+                 gsize      len,
+                 gsize     *written_len,
+                 GError   **error)
 {
     /* g_io_channel_write_chars (); */
 

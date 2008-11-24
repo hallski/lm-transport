@@ -8,6 +8,8 @@ struct LmSocketAddress {
     gchar *hostname;
     guint  port;
 
+    /* Add result iterator here */
+
     guint  ref_count;
 };
 

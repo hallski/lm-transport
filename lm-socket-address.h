@@ -10,11 +10,10 @@
 
 G_BEGIN_DECLS
 
-#define LM_TYPE_INET_ADDRESS   (lm_inet_address_get_type ())
 #define LM_TYPE_SOCKET_ADDRESS (lm_socket_address_get_type ())
 
-typedef struct LmInetAddress   LmInetAddress;
-typedef struct LmSocketAddress LmSocketAddress;
+typedef struct LmSocketAddress     LmSocketAddress;
+typedef struct LmSocketAddressIter LmSocketAddressIter;
 
 GType             lm_socket_address_get_type (void);
 LmSocketAddress * lm_socket_address_new      (const gchar     *hostname,
@@ -25,23 +24,21 @@ guint             lm_socket_address_get_port (LmSocketAddress *sa);
 
 gboolean          lm_socket_address_is_resolved (LmSocketAddress *sa);
 
-LmInetAddress *   lm_socket_address_get_inet_address   (LmSocketAddress *sa);
-GSList *          lm_socket_address_get_inet_addresses (LmSocketAddress *sa);
+/* The returned iterator is owned by the LmSocketAddress */
+LmSocketAddressIter *
+lm_socket_address_get_result_iter            (LmSocketAddress *sa);
 
+/* Ref counting */
 LmSocketAddress * lm_socket_address_ref      (LmSocketAddress *sa);
 void              lm_socket_address_unref    (LmSocketAddress *sa);
-
-GType             lm_inet_address_get_type     (void);
-struct addrinfo * lm_inet_address_get_addrinfo (LmInetAddress *ia);
-LmInetAddress *   lm_inet_address_ref          (LmInetAddress *ia);
-void              lm_inet_address_unref        (LmInetAddress *ia);
-
 
 /* Only to be used by the resolver */
 void              lm_socket_address_set_results (LmSocketAddress *sa,
                                                  struct addrinfo *ai);
-LmInetAddress *   lm_inet_address_new           (struct addrinfo *ai);
 
+/* Result iterator */
+struct addrinfo * lm_socket_address_iter_get_next (LmSocketAddressIter *iter);
+void              lm_socket_address_iter_reset    (LmSocketAddressIter *iter);
 
 G_END_DECLS
 

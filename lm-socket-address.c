@@ -13,14 +13,19 @@
 #include "lm-socket-address.h"
 
 struct LmSocketAddress {
-    gchar           *hostname;
-    guint            port;
+    gchar               *hostname;
+    guint                port;
 
     /* Add result iterator here */
-    struct addrinfo *results;
-    struct addrinfo *current;
+    struct addrinfo     *results;
+    LmSocketAddressIter *results_iter;
 
-    guint            ref_count;
+    guint                ref_count;
+};
+
+struct LmSocketAddressIter {
+    LmSocketAddress *sa;
+    struct addrinfo *current;
 };
 
 GType
@@ -73,6 +78,18 @@ lm_socket_address_is_resolved (LmSocketAddress *sa)
     return (sa->results != NULL);
 }
 
+LmSocketAddressIter *
+lm_socket_address_get_result_iter (LmSocketAddress *sa)
+{
+    if (!sa->results_iter) {
+        sa->results_iter = g_slice_new0 (LmSocketAddressIter);
+        sa->results_iter->sa = sa;
+        sa->results_iter->current = sa->results;
+    }
+
+    return sa->results_iter;
+}
+
 LmSocketAddress *
 lm_socket_address_ref (LmSocketAddress *sa)
 {
@@ -96,62 +113,12 @@ lm_socket_address_unref (LmSocketAddress *sa)
     }
 }
 
-GType
-lm_inet_address_get_type     (void)
-{
-    static GType  type;
-
-    if (type == 0) {
-        const gchar *str;
-
-        str = g_intern_static_string ("LmInetAddress");
-
-        type = g_boxed_type_register_static (str, 
-                                             (GBoxedCopyFunc) lm_inet_address_ref,
-                                             (GBoxedFreeFunc) lm_inet_address_unref);
-    }
-
-    return type;
-}
-
-struct LmInetAddress {
-    struct addrinfo *ai;
-
-    guint            ref_count;
-};
-
-struct addrinfo *
-lm_inet_address_get_addrinfo (LmInetAddress *ia)
-{
-    return ia->ai;
-}
-
-LmInetAddress *
-lm_inet_address_ref (LmInetAddress *ia)
-{
-    ia->ref_count++;
-
-    return ia;
-}
-
-void
-lm_inet_address_unref (LmInetAddress *ia)
-{
-    ia->ref_count--;
-
-    if (ia->ref_count == 0) {
-        /* Free addrinfo */
-        g_slice_free (LmInetAddress, ia);
-    }
-}
-
 void
 lm_socket_address_set_results (LmSocketAddress *sa, struct addrinfo *ai)
 {
     struct addrinfo *addr;
 
     sa->results = ai;
-    sa->current = sa->results;
 
     /* Set the lower level sockaddr_in port on all results */
     addr = ai;
@@ -161,19 +128,25 @@ lm_socket_address_set_results (LmSocketAddress *sa, struct addrinfo *ai)
         ((struct sockaddr_in *) addr->ai_addr)->sin_port = port;
         addr = addr->ai_next;
     }
-
 }
 
-LmInetAddress *
-lm_inet_address_new (struct addrinfo *ai)
+/* -- LmSocketAddressIter: Results iterator -- */
+struct addrinfo *
+lm_socket_address_iter_get_next (LmSocketAddressIter *iter)
 {
-    LmInetAddress *ia;
-    
-    ia = g_slice_new0 (LmInetAddress);
-    ia->ai = ai; /* Copy it */
-    ia->ref_count = 1;
+    struct addrinfo *current = iter->current;
+   
+    if (iter->current) {
+        iter->current = iter->current->ai_next;
+    }
 
-    return ia;
+    return current;
+}
+
+void
+lm_socket_address_iter_reset (LmSocketAddressIter *iter)
+{
+    iter->current = iter->sa->results;
 }
 
 

@@ -228,12 +228,16 @@ socket_set_property (GObject      *object,
                      GParamSpec   *pspec)
 {
     LmSocketPriv *priv;
+    GMainContext *context;
 
     priv = GET_PRIV (object);
 
     switch (param_id) {
         case PROP_CONTEXT:
-            priv->context = g_main_context_ref (g_value_get_pointer (value));
+            context = g_value_get_pointer (value);
+            if (context) {
+                priv->context = g_main_context_ref (context);
+            }
             break;
         case PROP_ADDRESS:
             priv->sa = g_value_get_boxed (value);
@@ -249,6 +253,8 @@ static void
 socket_do_connect (LmSocket *socket)
 {
     LmSocketPriv *priv;
+
+    priv = GET_PRIV (socket);
 
     if (!lm_socket_address_is_resolved (priv->sa)) {
         socket_resolve_address_and_connect (socket);
@@ -338,6 +344,19 @@ socket_resolve_address_and_connect (LmSocket *socket)
     priv->asyncns_query   = asyncns_query;
 }
 
+static void
+socket_cleanup_resolver (LmSocket *socket)
+{
+    LmSocketPriv *priv;
+
+    priv = GET_PRIV (socket);
+
+    asyncns_free (priv->asyncns_ctx);
+    g_source_destroy (priv->resolve_watch);
+    g_io_channel_unref (priv->resolve_channel);
+    priv->asyncns_query = NULL;
+}
+
 static gboolean
 socket_resolver_io_cb (GSource      *source,
                        GIOCondition  condition,
@@ -346,6 +365,7 @@ socket_resolver_io_cb (GSource      *source,
     LmSocketPriv    *priv;
     struct addrinfo *ans;
     int              err;
+    gboolean         ret_val = FALSE;
 
     priv = GET_PRIV (socket);
 
@@ -362,18 +382,21 @@ socket_resolver_io_cb (GSource      *source,
     if (err) {
         g_warning ("Error occurred during DNS lookup of %s", 
                    lm_socket_address_get_host (priv->sa));
-        return FALSE;
+        ret_val = FALSE;
     } else {
+        g_print ("Successful lookup of hostname: %s\n", 
+                 lm_socket_address_get_host (priv->sa));
         lm_socket_address_set_results (priv->sa, ans);
+        ret_val = TRUE;
     }
 
-    asyncns_free (priv->asyncns_ctx);
-    g_source_destroy (priv->resolve_watch);
-    g_io_channel_unref (priv->resolve_channel);
+    socket_cleanup_resolver (socket);
 
-    priv->asyncns_query = NULL;
+    if (ret_val) {
+        socket_resolved_connect (socket);
+    }
 
-    return FALSE;
+    return ret_val;
 }
 
 static void
@@ -385,14 +408,12 @@ socket_resolved_connect (LmSocket *socket)
 LmSocket * 
 lm_socket_new (LmSocketAddress *address, GMainContext *context)
 {
-    LmSocket     *socket;
-    LmSocketPriv *priv;
+    LmSocket *socket;
 
-    socket = g_object_new (LM_TYPE_SOCKET, "context", context, NULL);
-    priv   = GET_PRIV (socket);
-
-    priv->sa = lm_socket_address_ref (address);
-
+    socket = g_object_new (LM_TYPE_SOCKET, 
+                           "context", context,
+                           "address", address, 
+                           NULL);
     return socket;
 }
 

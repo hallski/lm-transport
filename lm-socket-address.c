@@ -2,6 +2,7 @@
  * Copyright (C) 2008 Mikael Hallendal <micke@imendio.com>
  */
 
+#include "asyncns.h"
 #include "lm-socket-address.h"
 
 struct LmSocketAddress {
@@ -10,7 +11,7 @@ struct LmSocketAddress {
 
     /* Add result iterator here */
     struct addrinfo *results;
-    struct addrinfo *current_result;
+    struct addrinfo *current;
 
     guint            ref_count;
 };
@@ -80,6 +81,10 @@ lm_socket_address_unref (LmSocketAddress *sa)
 
     if (sa->ref_count == 0) {
         g_free (sa->hostname);
+        if (sa->results) {
+            asyncns_freeaddrinfo (sa->results);
+        }
+
         g_slice_free (LmSocketAddress, sa);
     }
 }
@@ -136,7 +141,8 @@ lm_inet_address_unref (LmInetAddress *ia)
 void
 lm_socket_address_set_results (LmSocketAddress *sa, struct addrinfo *ai)
 {
-    /* Create LmInetAddresses and set them in a results list */
+    sa->results = ai;
+    sa->current = sa->results;
 }
 
 LmInetAddress *

@@ -20,9 +20,12 @@
 
 #include <config.h>
 
+#include <string.h>
 #include <unistd.h>
 
+#include "asyncns.h"
 #include "lm-marshal.h"
+#include "lm-misc.h"
 #include "lm-socket.h"
 
 #ifndef G_OS_WIN32
@@ -40,6 +43,11 @@ struct LmSocketPriv {
 
     SocketHandle     handle;
     GIOChannel      *io_channel;
+
+    asyncns_t       *asyncns_ctx;
+    asyncns_query_t *asyncns_query;
+    GSource         *resolve_watch;
+    GIOChannel      *resolve_channel;
 
     gint             my_prop;
 };
@@ -67,6 +75,9 @@ static GIOStatus socket_do_write            (LmSocket          *socket,
                                              GError           **error);
 static void 
 socket_resolve_address_and_connect          (LmSocket          *socket);
+static gboolean  socket_resolver_io_cb      (GSource           *source,
+                                             GIOCondition       condition,
+                                             LmSocket          *socket);
 static void      socket_resolved_connect    (LmSocket          *socket);
 
 G_DEFINE_TYPE (LmSocket, lm_socket, G_TYPE_OBJECT)
@@ -292,11 +303,83 @@ socket_do_write (LmSocket  *socket,
 
 static void
 socket_resolve_address_and_connect (LmSocket *socket)
-{}
+{
+    LmSocketPriv    *priv;
+    struct           addrinfo req;
+    asyncns_t       *asyncns_ctx;
+    asyncns_query_t *asyncns_query;
+    GSource         *resolve_watch;
+    GIOChannel      *resolve_channel;
+
+    priv = GET_PRIV (socket);
+
+    memset (&req, 0, sizeof(req));
+    req.ai_family   = AF_UNSPEC;
+    req.ai_socktype = SOCK_STREAM;
+    req.ai_protocol = IPPROTO_TCP;
+    
+    asyncns_ctx = asyncns_new (1);
+
+    resolve_channel = g_io_channel_unix_new (asyncns_fd (asyncns_ctx));
+
+    resolve_watch = lm_misc_add_io_watch (priv->context,
+                                          resolve_channel,
+                                          G_IO_IN,
+                                          (GIOFunc) socket_resolver_io_cb,
+                                          socket);
+    
+    asyncns_query = asyncns_getaddrinfo (asyncns_ctx, 
+                                         lm_socket_address_get_host (priv->sa),
+                                         NULL, &req);
+
+    priv->asyncns_ctx     = asyncns_ctx;
+    priv->resolve_channel = resolve_channel;
+    priv->resolve_watch   = resolve_watch;
+    priv->asyncns_query   = asyncns_query;
+}
+
+static gboolean
+socket_resolver_io_cb (GSource      *source,
+                       GIOCondition  condition,
+                       LmSocket     *socket)
+{
+    LmSocketPriv    *priv;
+    struct addrinfo *ans;
+    int              err;
+
+    priv = GET_PRIV (socket);
+
+    asyncns_wait (priv->asyncns_ctx, FALSE);
+
+    if (!asyncns_isdone (priv->asyncns_ctx, priv->asyncns_query)) {
+        return TRUE;
+    }
+
+    err = asyncns_getaddrinfo_done (priv->asyncns_ctx, 
+                                    priv->asyncns_query,
+                                    &ans);
+
+    if (err) {
+        g_warning ("Error occurred during DNS lookup of %s", 
+                   lm_socket_address_get_host (priv->sa));
+        return FALSE;
+    } else {
+        lm_socket_address_set_results (priv->sa, ans);
+    }
+
+    asyncns_free (priv->asyncns_ctx);
+    g_source_destroy (priv->resolve_watch);
+    g_io_channel_unref (priv->resolve_channel);
+
+    priv->asyncns_query = NULL;
+
+    return FALSE;
+}
 
 static void
 socket_resolved_connect (LmSocket *socket)
-{}
+{
+}
 
 /* -- Public API -- */
 LmSocket * 

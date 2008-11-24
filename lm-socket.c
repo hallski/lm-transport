@@ -44,6 +44,7 @@ static void      socket_set_property        (GObject           *object,
                                              guint              param_id,
                                              const GValue      *value,
                                              GParamSpec        *pspec);
+static void      socket_do_connect          (LmSocket          *socket);
 static void      socket_do_close            (LmSocket          *socket);
 static GIOStatus socket_do_read             (LmSocket          *socket,
                                              gchar             *buf,
@@ -81,6 +82,7 @@ lm_socket_class_init (LmSocketClass *class)
     GObjectClass *object_class = G_OBJECT_CLASS (class);
     GParamSpec   *pspec;
 
+    class->connect             = socket_do_connect;
     class->close               = socket_do_close;
     class->read                = socket_do_read;
     class->write               = socket_do_write;
@@ -209,6 +211,11 @@ socket_set_property (GObject      *object,
 }
 
 static void
+socket_do_connect (LmSocket *socket)
+{
+}
+
+static void
 socket_do_close (LmSocket *socket)
 {
 }
@@ -264,11 +271,21 @@ lm_socket_new (LmSocketAddress *address, GMainContext *context)
 void
 lm_socket_connect (LmSocket *socket)
 {
+    if (!LM_SOCKET_GET_CLASS(socket)->connect) {
+        g_assert_not_reached ();
+    }
+
+    LM_SOCKET_GET_CLASS(socket)->connect (socket);
 }
 
 void
 lm_socket_close (LmSocket *socket)
 {
+    if (!LM_SOCKET_GET_CLASS(socket)->close) {
+        g_assert_not_reached ();
+    }
+
+    LM_SOCKET_GET_CLASS(socket)->close (socket);
 }
 
 GIOStatus
@@ -278,9 +295,13 @@ lm_socket_read (LmSocket  *socket,
                 gsize     *read_len,
                 GError   **error)
 {
-    /* g_io_channel_read_chars (); */
+     if (!LM_SOCKET_GET_CLASS(socket)->read) {
+         g_assert_not_reached ();
+     }
 
-    return G_IO_STATUS_NORMAL;
+     LM_SOCKET_GET_CLASS(socket)->read (socket, buf, len, read_len, error);
+
+     return G_IO_STATUS_NORMAL;
 }
 
 GIOStatus
@@ -290,7 +311,12 @@ lm_socket_write (LmSocket  *socket,
                  gsize     *written_len,
                  GError   **error)
 {
-    /* g_io_channel_write_chars (); */
+    if (!LM_SOCKET_GET_CLASS(socket)->write) {
+        g_assert_not_reached ();
+    }
+
+    LM_SOCKET_GET_CLASS(socket)->write (socket, buf, 
+                                        len, written_len, error);
 
     return G_IO_STATUS_NORMAL;
 }

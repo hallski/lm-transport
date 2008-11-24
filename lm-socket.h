@@ -45,6 +45,7 @@ struct LmSocketClass {
     GObjectClass parent_class;
     
     /* <vtable> */
+    void       (*connect)        (LmSocket        *socket);
     void       (*close)          (LmSocket        *socket);
     GIOStatus  (*read)           (LmSocket        *socket,
                                   gchar           *buf,

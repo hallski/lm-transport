@@ -13,6 +13,24 @@ struct LmSocketAddress {
     guint  ref_count;
 };
 
+GType
+lm_socket_address_get_type (void)
+{
+    static GType  type;
+
+    if (type == 0) {
+        const gchar *str;
+
+        str = g_intern_static_string ("LmSocketAddress");
+
+        type = g_boxed_type_register_static (str, 
+                                             (GBoxedCopyFunc) lm_socket_address_ref,
+                                             (GBoxedFreeFunc) lm_socket_address_unref);
+    }
+
+    return type;
+}
+
 LmSocketAddress *
 lm_socket_address_new (const gchar *hostname, guint port)
 {

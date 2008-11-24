@@ -380,8 +380,9 @@ socket_resolver_io_cb (GSource      *source,
                                     &ans);
 
     if (err) {
-        g_warning ("Error occurred during DNS lookup of %s", 
+        g_warning ("Error occurred during DNS lookup of %s. Should be signalled back to the user.",
                    lm_socket_address_get_host (priv->sa));
+
         ret_val = FALSE;
     } else {
         g_print ("Successful lookup of hostname: %s\n", 

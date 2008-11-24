@@ -2,6 +2,13 @@
  * Copyright (C) 2008 Mikael Hallendal <micke@imendio.com>
  */
 
+#include <config.h>
+
+/* Needed on Mac OS X */
+#if HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
+
 #include "asyncns.h"
 #include "lm-socket-address.h"
 
@@ -141,8 +148,20 @@ lm_inet_address_unref (LmInetAddress *ia)
 void
 lm_socket_address_set_results (LmSocketAddress *sa, struct addrinfo *ai)
 {
+    struct addrinfo *addr;
+
     sa->results = ai;
     sa->current = sa->results;
+
+    /* Set the lower level sockaddr_in port on all results */
+    addr = ai;
+    while (addr) {
+        int port;
+        port = htons (sa->port);
+        ((struct sockaddr_in *) addr->ai_addr)->sin_port = port;
+        addr = addr->ai_next;
+    }
+
 }
 
 LmInetAddress *

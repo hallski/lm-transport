@@ -403,6 +403,7 @@ socket_resolver_io_cb (GSource      *source,
 static void
 socket_resolved_connect (LmSocket *socket)
 {
+    /* */
 }
 
 /* -- Public API -- */

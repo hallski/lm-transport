@@ -21,26 +21,26 @@
 #include <config.h>
 
 #include "lm-marshal.h"
-#include "lm-secure-socket.h"
+#include "lm-secure-channel.h"
 
-#define GET_PRIV(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), LM_TYPE_SECURE_SOCKET, LmSecureSocketPriv))
+#define GET_PRIV(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), LM_TYPE_SECURE_CHANNEL, LmSecureChannelPriv))
 
-typedef struct LmSecureSocketPriv LmSecureSocketPriv;
-struct LmSecureSocketPriv {
+typedef struct LmSecureChannelPriv LmSecureChannelPriv;
+struct LmSecureChannelPriv {
     gint my_prop;
 };
 
-static void     secure_socket_finalize            (GObject           *object);
-static void     secure_socket_get_property        (GObject           *object,
+static void     secure_channel_finalize            (GObject           *object);
+static void     secure_channel_get_property        (GObject           *object,
                                            guint              param_id,
                                            GValue            *value,
                                            GParamSpec        *pspec);
-static void     secure_socket_set_property        (GObject           *object,
+static void     secure_channel_set_property        (GObject           *object,
                                            guint              param_id,
                                            const GValue      *value,
                                            GParamSpec        *pspec);
 
-G_DEFINE_TYPE (LmSecureSocket, lm_secure_socket, G_TYPE_OBJECT)
+G_DEFINE_TYPE (LmSecureChannel, lm_secure_channel, G_TYPE_OBJECT)
 
 enum {
     PROP_0,
@@ -55,13 +55,13 @@ enum {
 static guint signals[LAST_SIGNAL] = { 0 };
 
 static void
-lm_secure_socket_class_init (LmSecureSocketClass *class)
+lm_secure_channel_class_init (LmSecureChannelClass *class)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (class);
 
-    object_class->finalize     = secure_socket_finalize;
-    object_class->get_property = secure_socket_get_property;
-    object_class->set_property = secure_socket_set_property;
+    object_class->finalize     = secure_channel_finalize;
+    object_class->get_property = secure_channel_get_property;
+    object_class->set_property = secure_channel_set_property;
 
     g_object_class_install_property (object_class,
                                      PROP_MY_PROP,
@@ -81,35 +81,35 @@ lm_secure_socket_class_init (LmSecureSocketClass *class)
                       G_TYPE_NONE, 
                       1, G_TYPE_INT);
     
-    g_type_class_add_private (object_class, sizeof (LmSecureSocketPriv));
+    g_type_class_add_private (object_class, sizeof (LmSecureChannelPriv));
 }
 
 static void
-lm_secure_socket_init (LmSecureSocket *secure_socket)
+lm_secure_channel_init (LmSecureChannel *secure_channel)
 {
-    LmSecureSocketPriv *priv;
+    LmSecureChannelPriv *priv;
 
-    priv = GET_PRIV (secure_socket);
+    priv = GET_PRIV (secure_channel);
 
 }
 
 static void
-secure_socket_finalize (GObject *object)
+secure_channel_finalize (GObject *object)
 {
-    LmSecureSocketPriv *priv;
+    LmSecureChannelPriv *priv;
 
     priv = GET_PRIV (object);
 
-    (G_OBJECT_CLASS (lm_secure_socket_parent_class)->finalize) (object);
+    (G_OBJECT_CLASS (lm_secure_channel_parent_class)->finalize) (object);
 }
 
 static void
-secure_socket_get_property (GObject    *object,
+secure_channel_get_property (GObject    *object,
                     guint       param_id,
                     GValue     *value,
                     GParamSpec *pspec)
 {
-    LmSecureSocketPriv *priv;
+    LmSecureChannelPriv *priv;
 
     priv = GET_PRIV (object);
 
@@ -124,12 +124,12 @@ secure_socket_get_property (GObject    *object,
 }
 
 static void
-secure_socket_set_property (GObject      *object,
+secure_channel_set_property (GObject      *object,
                     guint         param_id,
                     const GValue *value,
                     GParamSpec   *pspec)
 {
-    LmSecureSocketPriv *priv;
+    LmSecureChannelPriv *priv;
 
     priv = GET_PRIV (object);
 

@@ -29,8 +29,8 @@ set(SOURCES
 	lm-marshal.h
 	lm-misc.c
 	lm-misc.h
-	#lm-secure-socket.c
-	#lm-secure-socket.h
+	lm-secure-channel.c
+	lm-secure-channel.h
 	lm-sock.c
 	lm-sock.h
 	lm-socket.c

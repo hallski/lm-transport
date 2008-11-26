@@ -4,30 +4,49 @@
 
 #include <glib.h>
 
-#include "lm-socket.h"
+#include "lm-resolver.h"
+
+static gchar *domain;
+
+static void
+resolver_finished_cb (LmResolver       *resolver, 
+                      LmResolverResult  result,
+                      LmSocketAddress  *sa,
+                      gpointer          user_data)
+{
+        g_print ("Looked up service 'xmpp-client' for domain '%s'\n", domain);
+        g_print ("Found it point to server '%s' on port '%d'\n",
+                 lm_socket_address_get_host (sa),
+                 lm_socket_address_get_port (sa));
+
+        g_free (domain);
+}
 
 int
 main (int argc, char **argv)
 {
-        LmSocket        *socket;
-        LmSocketAddress *sa;
         GMainLoop       *loop;
+        LmResolver      *resolver;
 
         g_type_init ();
 
         if (argc < 2) {
-                g_print ("Give a host\n");
+                g_print ("Give a domain\n");
                 return 1;
         }
 
-        g_print ("Connecting to %s ...\n", argv[1]);
-        
-        sa = lm_socket_address_new (argv[1], 5222);
-        socket = lm_socket_new (sa, NULL);
-        
-        loop = g_main_loop_new (NULL, FALSE);
+        domain = g_strdup (argv[1]);
 
-        lm_socket_connect (socket);
+        g_print ("Connecting to %s ...\n", domain);
+
+        resolver = lm_resolver_lookup_service (NULL,
+                                               domain,
+                                               LM_RESOLVER_SRV_XMPP_CLIENT,
+                                               NULL);
+        g_signal_connect (resolver, "finished", G_CALLBACK (resolver_finished_cb),
+                          NULL);
+
+        loop = g_main_loop_new (NULL, FALSE);
 
         g_main_loop_run (loop);
 

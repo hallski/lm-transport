@@ -19,6 +19,8 @@ set(SOURCES
 	asyncns.h
 	lm-dummy.c
 	lm-dummy.h
+	lm-error.c
+	lm-error.h
 	lm-idummy.c
 	lm-idummy.h
 	lm-marshal.c
@@ -36,8 +38,8 @@ set(SOURCES
 	lm-openssl-socket.h
 	lm-resolver.c
 	lm-resolver.h
-	#	lm-asyncns-resolver.c
-	#lm-asyncns-resolver.h
+	lm-asyncns-resolver.c
+	lm-asyncns-resolver.h
 	#lm-blocking-resolver.c
 	#lm-blocking-resolver.h
 )

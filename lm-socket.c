@@ -253,6 +253,10 @@ socket_read (LmChannel *channel,
 
     priv = GET_PRIV (channel);
 
+    if (!priv->io_channel) {
+        return G_IO_STATUS_EOF;
+    }
+
     return g_io_channel_read_chars (priv->io_channel, 
                                     buf, len, read_len, error);
 }
@@ -268,8 +272,18 @@ socket_write (LmChannel    *channel,
 
     priv = GET_PRIV (channel);
 
+    if (!priv->io_channel) {
+        return G_IO_STATUS_EOF;
+    }
+
     return g_io_channel_write_chars (priv->io_channel,
                                      buf, len, written_len, error);
+}
+
+static void
+socket_emit_connect_result (LmSocket *socket, LmSocketConnectResult result)
+{
+    g_signal_emit (socket, signals[CONNECT_RESULT], 0, result);
 }
 
 static void
@@ -281,17 +295,13 @@ socket_resolver_finished_cb (LmResolver       *resolver,
     if (result != LM_RESOLVER_RESULT_OK) {
         g_warning ("Failed to lookup host: %s\n",
                    lm_socket_address_get_host (address));
+        socket_emit_connect_result (socket, 
+                                    LM_SOCKET_CONNECT_FAILED_DNS);
 
         return;
     }
 
     socket_attempt_connect_next (socket);
-}
-
-static void
-socket_emit_connect_result (LmSocket *socket, gboolean result)
-{
-    g_signal_emit (socket, signals[CONNECT_RESULT], 0, result);
 }
 
 static void
@@ -308,12 +318,13 @@ socket_attempt_connect_next (LmSocket *socket)
         addr = lm_socket_address_iter_get_next (priv->sa_iter);
         if (!addr) {
             g_warning ("Failed to connect, phase 0");
-            socket_emit_connect_result (socket, FALSE);
+            socket_emit_connect_result (socket, 
+                                        LM_SOCKET_CONNECT_FAILED_TRIED_ALL);
             break;
         }
 
         if (!socket_attempt_connect (socket, addr)) {
-            g_warning ("Failed to connect, %s", G_STRFUNC);
+            g_warning ("Failed to connect, trying next, %s", G_STRFUNC);
             /* Try next */
         } else {
             break;
@@ -416,7 +427,10 @@ socket_connect_cb (GIOChannel   *channel,
         /* FIXME: if we add these (HUP and ERR), we don't get ANY
          * response from the server, this is to do with the way that
          * windows handles watches, see bug #331214.
+         *
+         * Is it fine if we leave the G_IO_OUT and G_IO_HUP from connect? 
          */
+
         priv->io_watch = 
             lm_misc_add_io_watch (priv->context,
                                   priv->io_channel,
@@ -425,7 +439,7 @@ socket_connect_cb (GIOChannel   *channel,
                                   socket);
 
         priv->connected = TRUE;
-        socket_emit_connect_result (socket, TRUE);
+        socket_emit_connect_result (socket, LM_SOCKET_CONNECT_OK);
     }
 
     return TRUE;

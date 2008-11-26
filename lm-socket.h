@@ -45,6 +45,12 @@ struct LmSocketClass {
     GObjectClass parent_class;
 };
 
+typedef enum {
+    LM_SOCKET_CONNECT_OK,
+    LM_SOCKET_CONNECT_FAILED_DNS,
+    LM_SOCKET_CONNECT_FAILED_TRIED_ALL,
+} LmSocketConnectResult;
+
 GType      lm_socket_get_type  (void);
 
 LmSocket * lm_socket_new            (GMainContext    *context,

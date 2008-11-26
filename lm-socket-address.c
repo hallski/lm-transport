@@ -106,6 +106,7 @@ lm_socket_address_unref (LmSocketAddress *sa)
     if (sa->ref_count == 0) {
         g_free (sa->hostname);
         if (sa->results) {
+            /* TODO: Use the correct free function here */
             asyncns_freeaddrinfo (sa->results);
         }
 

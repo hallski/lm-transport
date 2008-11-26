@@ -97,7 +97,7 @@ enum {
 };
 
 enum {
-    CONNECTED,
+    CONNECT_RESULT,
     LAST_SIGNAL
 };
 
@@ -126,8 +126,8 @@ lm_socket_class_init (LmSocketClass *class)
                                 G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_ADDRESS, pspec);
 
-    signals[CONNECTED] = 
-        g_signal_new ("connected",
+    signals[CONNECT_RESULT] = 
+        g_signal_new ("connect_result",
                       G_OBJECT_CLASS_TYPE (object_class),
                       G_SIGNAL_RUN_LAST,
                       0,
@@ -218,6 +218,9 @@ socket_set_property (GObject      *object,
             break;
         case PROP_ADDRESS:
             priv->sa = g_value_get_boxed (value);
+            if (priv->sa) {
+                lm_socket_address_ref (priv->sa);
+            }
             break;
         break;
     default:
@@ -231,7 +234,7 @@ socket_close (LmChannel *channel)
 {
     LmSocketPriv *priv;
 
-    priv = GET_PRIV (socket);
+    priv = GET_PRIV (channel);
 
     _lm_sock_close (priv->handle);
 }
@@ -245,7 +248,7 @@ socket_read (LmChannel *channel,
 {
     LmSocketPriv *priv;
 
-    priv = GET_PRIV (socket);
+    priv = GET_PRIV (channel);
 
     return g_io_channel_read_chars (priv->io_channel, 
                                     buf, len, read_len, error);
@@ -260,7 +263,7 @@ socket_write (LmChannel    *channel,
 {
     LmSocketPriv *priv;
 
-    priv = GET_PRIV (socket);
+    priv = GET_PRIV (channel);
 
     return g_io_channel_write_chars (priv->io_channel,
                                      buf, len, written_len, error);
@@ -283,6 +286,12 @@ socket_resolver_finished_cb (LmResolver       *resolver,
 }
 
 static void
+socket_emit_connect_result (LmSocket *socket, gboolean result)
+{
+    g_signal_emit (socket, signals[CONNECT_RESULT], 0, result);
+}
+
+static void
 socket_attempt_connect_next (LmSocket *socket)
 {
     LmSocketPriv    *priv = GET_PRIV (socket);
@@ -296,6 +305,7 @@ socket_attempt_connect_next (LmSocket *socket)
         addr = lm_socket_address_iter_get_next (priv->sa_iter);
         if (!addr) {
             g_warning ("Failed to connect, phase 0");
+            socket_emit_connect_result (socket, FALSE);
             break;
         }
 
@@ -338,7 +348,7 @@ socket_attempt_connect (LmSocket *lm_socket, struct addrinfo *addr)
                                            priv->io_channel,
                                            IO_CONDITION_ALL,
                                            (GIOFunc) socket_io_cb,
-                                           socket);
+                                           lm_socket);
 
     res = connect (priv->handle, addr->ai_addr, (int)addr->ai_addrlen);
     if (res < 0) {
@@ -363,7 +373,7 @@ socket_handle_connect_reply (LmSocket *socket, gboolean out_event)
     
     if (out_event) {
         priv->connected = TRUE;
-        g_signal_emit (socket, signals[CONNECTED], 0);
+        socket_emit_connect_result (socket, TRUE);
         return TRUE;
     } else {
         socklen_t len;

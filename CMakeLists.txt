@@ -51,6 +51,9 @@ set(SOURCES
 add_executable(test test.c ${SOURCES})
 target_link_libraries(test ${LM_LIBRARIES} 'resolv')
 
+add_executable(test-connect test-connect.c ${SOURCES})
+target_link_libraries(test-connect ${LM_LIBRARIES} 'resolv')
+
 include_directories("." ${LM_INCLUDE_DIRS})
 link_directories(${LM_LIBRARY_DIRS})
 

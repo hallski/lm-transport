@@ -7,3 +7,4 @@ CMakeFiles
 CMakeCache.txt
 lm-marshal.[ch]
 test
+test-connect

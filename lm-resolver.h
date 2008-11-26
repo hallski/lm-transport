@@ -70,6 +70,7 @@ LmResolver *   lm_resolver_lookup_service    (GMainContext     *context,
                                               const gchar      *srv);
 void           lm_resolver_cancel            (LmResolver       *resolver);
 
+void           lm_resolver_freeaddrinfo      (struct addrinfo *addr);
 
 gboolean       _lm_resolver_parse_srv_response (unsigned char  *srv, 
                                                 int             srv_len, 

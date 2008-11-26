@@ -126,6 +126,7 @@ asyncns_resolver_cleanup (LmResolver *resolver)
 
     if (priv->sa) {
         lm_socket_address_unref (priv->sa);
+        priv->sa = NULL;
     }
 
     priv->resolv_query = NULL;
@@ -138,7 +139,7 @@ asyncns_resolver_io_cb (GSource      *source,
                         GIOCondition  condition,
                         LmResolver   *resolver)
 {
-    LmAsyncnsResolverPriv     *priv = GET_PRIV (resolver);
+    LmAsyncnsResolverPriv *priv = GET_PRIV (resolver);
 
     asyncns_wait (priv->asyncns_ctx, FALSE);
 
@@ -161,8 +162,7 @@ asyncns_resolver_io_cb (GSource      *source,
 }
 
 static gboolean
-asyncns_resolver_prep (LmResolver  *resolver, 
-                       int          resolve_type)
+asyncns_resolver_prep (LmResolver *resolver, int resolve_type)
 {
     LmAsyncnsResolverPriv *priv = GET_PRIV (resolver);
     GMainContext          *context;
@@ -238,8 +238,6 @@ asyncns_resolver_srv_done (LmResolver *resolver)
     int                    srv_len;
     LmResolverResult       result;
 
-    g_print ("srv_done callback\n");
-
     srv_len = asyncns_res_done (priv->asyncns_ctx, 
                                 priv->resolv_query, &srv_ans);
 
@@ -252,8 +250,6 @@ asyncns_resolver_srv_done (LmResolver *resolver)
         gchar    *new_server;
         guint     new_port;
         gboolean  parse_result;
-
-        g_print ("trying to parse srv response\n");
 
         parse_result = _lm_resolver_parse_srv_response (srv_ans, srv_len,
                                                         &new_server, &new_port);
@@ -271,14 +267,16 @@ asyncns_resolver_srv_done (LmResolver *resolver)
 }
 
 static void
-asyncns_resolver_lookup_host (LmResolver       *resolver,
-                              LmSocketAddress  *sa)
+asyncns_resolver_lookup_host (LmResolver *resolver, LmSocketAddress *sa)
 {
     LmAsyncnsResolverPriv *priv;
     struct addrinfo        req;
 
     g_return_if_fail (LM_IS_ASYNCNS_RESOLVER (resolver));
     g_return_if_fail (sa != NULL);
+
+    priv = GET_PRIV (resolver);
+    priv->sa = lm_socket_address_ref (sa);
 
     if (!asyncns_resolver_prep (resolver, RESOLVE_TYPE_HOST)) {
         g_warning ("Failed to initialize the asyncns library");
@@ -297,8 +295,7 @@ asyncns_resolver_lookup_host (LmResolver       *resolver,
 }
 
 static void
-asyncns_resolver_lookup_srv (LmResolver   *resolver, 
-                             const gchar  *srv)
+asyncns_resolver_lookup_srv (LmResolver *resolver, const gchar *srv)
 {
     LmAsyncnsResolverPriv *priv;
     

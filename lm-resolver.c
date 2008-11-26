@@ -2,7 +2,7 @@
 /*
  * Copyright (C) 2008 Imendio AB
  *
- * This program is free software; you can redistribute it and/or
+#* This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation; either version 2 of the
  * License, or (at your option) any later version.
@@ -27,6 +27,14 @@
 #include "lm-asyncns-resolver.h"
 #include "lm-marshal.h"
 #include "lm-resolver.h"
+
+#define HAVE_ASYNCNS 1
+
+#ifdef HAVE_ASYNCNS
+#include "asyncns.h"
+#undef freeaddrinfo
+#define freeaddrinfo(x) asyncns_freeaddrinfo(x)
+#endif /* HAVE_ASYNCNS */
 
 #define GET_PRIV(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), LM_TYPE_RESOLVER, LmResolverPriv))
 
@@ -160,9 +168,9 @@ resolver_create (GMainContext *context)
 {
     GType type;
 
-#if 0
+#ifdef HAVE_ASYNCNS
     type = LM_TYPE_ASYNCNS_RESOLVER;
-#else
+#else /* HAVE_ASYNCNS */
     type = LM_TYPE_BLOCKING_RESOLVER;
 #endif /* HAVE_ASYNCNS */
 
@@ -234,6 +242,12 @@ lm_resolver_cancel (LmResolver *resolver)
     }
 
     return LM_RESOLVER_GET_CLASS(resolver)->cancel (resolver);
+}
+
+void 
+lm_resolver_freeaddrinfo (struct addrinfo *addr)
+{
+    freeaddrinfo (addr);
 }
 
 gboolean

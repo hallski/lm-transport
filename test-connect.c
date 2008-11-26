@@ -28,6 +28,8 @@ write_some (LmSocket *socket)
                           msg, (gssize)strlen (msg), NULL, NULL);
 
         g_print ("Returning\n");
+
+        lm_channel_close (LM_CHANNEL (socket));
 }
 
 static void
@@ -116,7 +118,8 @@ main (int argc, char **argv)
         g_main_loop_run (loop);
 
         g_object_unref (socket);
-   /*     lm_socket_address_unref (sa);*/
+
+        lm_socket_address_unref (sa);
 
         return 0;
 }

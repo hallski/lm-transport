@@ -9,7 +9,7 @@
 #include <netinet/in.h>
 #endif
 
-#include "asyncns.h"
+#include "lm-resolver.h"
 #include "lm-socket-address.h"
 
 struct LmSocketAddress {
@@ -98,6 +98,8 @@ lm_socket_address_ref (LmSocketAddress *sa)
 {
     sa->ref_count++;
 
+    /* g_print ("SA_REFCOUNT = %d\n", sa->ref_count); */
+
     return sa;
 }
 
@@ -106,11 +108,12 @@ lm_socket_address_unref (LmSocketAddress *sa)
 {
     sa->ref_count--;
 
+    /* g_print ("SA_REFCOUNT = %d\n", sa->ref_count); */
+    
     if (sa->ref_count == 0) {
         g_free (sa->hostname);
         if (sa->results) {
-            /* TODO: Use the correct free function here */
-            asyncns_freeaddrinfo (sa->results);
+            lm_resolver_freeaddrinfo (sa->results);
         }
 
         g_slice_free (LmSocketAddress, sa);
@@ -122,6 +125,8 @@ lm_socket_address_set_results (LmSocketAddress *sa, struct addrinfo *ai)
 {
     struct addrinfo *addr;
 
+    g_return_if_fail (sa != NULL);
+
     sa->results = ai;
 
     /* Set the lower level sockaddr_in port on all results */
@@ -130,6 +135,7 @@ lm_socket_address_set_results (LmSocketAddress *sa, struct addrinfo *ai)
         int port;
         port = htons (sa->port);
         ((struct sockaddr_in *) addr->ai_addr)->sin_port = port;
+
         addr = addr->ai_next;
     }
 }

@@ -23,6 +23,7 @@
 #include <resolv.h>
 #include <string.h>
 
+#include "lm-blocking-resolver.h"
 #include "lm-asyncns-resolver.h"
 #include "lm-marshal.h"
 #include "lm-resolver.h"
@@ -159,7 +160,7 @@ resolver_create (GMainContext *context)
 {
     GType type;
 
-#if 1
+#if 0
     type = LM_TYPE_ASYNCNS_RESOLVER;
 #else
     type = LM_TYPE_BLOCKING_RESOLVER;

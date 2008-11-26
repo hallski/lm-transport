@@ -23,6 +23,8 @@
 
 #include <glib-object.h>
 
+#include "lm-resolver.h"
+
 G_BEGIN_DECLS
 
 #define LM_TYPE_ASYNCNS_RESOLVER            (lm_asyncns_resolver_get_type ())

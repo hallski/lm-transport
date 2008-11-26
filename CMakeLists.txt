@@ -40,8 +40,8 @@ set(SOURCES
 	lm-resolver.h
 	lm-asyncns-resolver.c
 	lm-asyncns-resolver.h
-	#lm-blocking-resolver.c
-	#lm-blocking-resolver.h
+	lm-blocking-resolver.c
+	lm-blocking-resolver.h
 )
 
 add_executable(test test.c ${SOURCES})

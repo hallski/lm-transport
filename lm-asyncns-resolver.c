@@ -60,10 +60,10 @@ struct LmAsyncnsResolverPriv {
 static void     asyncns_resolver_finalize      (GObject          *object);
 static void     asyncns_resolver_cleanup       (LmResolver       *resolver);
 static void     asyncns_resolver_host_done     (LmResolver       *resolver);
+static void     asyncns_resolver_srv_done      (LmResolver       *resolver);
 static gboolean asyncns_resolver_lookup_host   (LmResolver       *resolver,
                                                 LmSocketAddress  *sa,
                                                 GError          **error);
-static void     asyncns_resolver_srv_done      (LmResolver       *resolver);
 static gboolean asyncns_resolver_lookup_srv    (LmResolver       *resolver,
                                                 const gchar      *srv,
                                                 GError          **error);
@@ -124,6 +124,10 @@ asyncns_resolver_cleanup (LmResolver *resolver)
     if (priv->asyncns_ctx) {
         asyncns_free (priv->asyncns_ctx);
         priv->asyncns_ctx = NULL;
+    }
+
+    if (priv->sa) {
+        lm_socket_address_unref (priv->sa);
     }
 
     priv->resolv_query = NULL;

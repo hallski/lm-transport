@@ -37,31 +37,18 @@ G_BEGIN_DECLS
 typedef struct LmSocket      LmSocket;
 typedef struct LmSocketClass LmSocketClass;
 
-#ifndef G_OS_WIN32
-typedef int SocketHandle;
-#else  /* G_OS_WIN32 */
-typedef SOCKET SocketHandle;
-#endif /* G_OS_WIN32 */
-
 struct LmSocket {
     GObject parent;
 };
 
 struct LmSocketClass {
     GObjectClass parent_class;
-
-    /* <vtable> */
-    SocketHandle  (*get_handle)          (LmSocket *socket);
-    void          (*set_handle_blocking) (LmSocket *socket,
-                                          gboolean  block);
-    void          (*close_handle)        (LmSocket *socket);
 };
 
 GType      lm_socket_get_type  (void);
 
-LmSocket * lm_socket_new            (LmSocketAddress *address,
-                                     GMainContext    *context);
-
+LmSocket * lm_socket_new            (GMainContext    *context,
+                                     LmSocketAddress *address);
 void       lm_socket_connect        (LmSocket        *socket);
 
 G_END_DECLS

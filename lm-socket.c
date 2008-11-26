@@ -49,6 +49,8 @@ struct LmSocketPriv {
     GIOChannel          *io_channel;
     GSource             *io_watch;
 
+    gboolean             connected;
+
     /* DNS Lookup */
     LmResolver          *resolver;
 
@@ -77,7 +79,12 @@ static GIOStatus socket_write               (LmChannel         *channel,
                                              gsize             *written_len,
                                              GError           **error);
 static void      socket_close               (LmChannel         *channel);
-static SocketHandle socket_get_handle       (LmSocket          *socket);
+static void      socket_attempt_connect_next(LmSocket          *socket);
+static gboolean  socket_attempt_connect     (LmSocket          *socket,
+                                             struct addrinfo   *addr);
+static gboolean  socket_io_cb               (GIOChannel        *channel,
+                                             GIOCondition       condition,
+                                             LmSocket          *socket);
 
 G_DEFINE_TYPE_WITH_CODE (LmSocket, lm_socket, G_TYPE_OBJECT,
                          G_IMPLEMENT_INTERFACE (LM_TYPE_CHANNEL,
@@ -138,6 +145,8 @@ lm_socket_init (LmSocket *socket)
     LmSocketPriv *priv;
 
     priv = GET_PRIV (socket);
+
+    priv->connected = FALSE;
 }
 
 static void
@@ -157,6 +166,10 @@ socket_finalize (GObject *object)
 
     if (priv->sa) {
         lm_socket_address_unref (priv->sa);
+    }
+
+    if (priv->connected) {
+        /* TODO: disconnect and what not */
     }
 
     (G_OBJECT_CLASS (lm_socket_parent_class)->finalize) (object);
@@ -266,95 +279,52 @@ socket_resolver_finished_cb (LmResolver       *resolver,
         return;
     }
 
-
-    socket_real_connect (socket);
+    socket_attempt_connect_next (socket);
 }
 
 static void
-socket_do_connect (LmSocket *socket)
+socket_attempt_connect_next (LmSocket *socket)
 {
-    LmSocketPriv *priv;
+    LmSocketPriv    *priv = GET_PRIV (socket);
+    struct addrinfo *addr;
 
-    priv = GET_PRIV (socket);
+    if (!priv->sa_iter) {
+        priv->sa_iter = lm_socket_address_get_result_iter (priv->sa);
+    }
 
-    if (!lm_socket_address_is_resolved (priv->sa)) {
-        priv->resolver = lm_resolver_lookup_host (priv->context, priv->sa);
-        g_signal_connect (priv->resolver, "finished", 
-                          G_CALLBACK (socket_resolver_finished_cb),
-                          socket);
-    } else {
-        socket_real_connect (socket);
+    while (TRUE) {
+        addr = lm_socket_address_iter_get_next (priv->sa_iter);
+        if (!addr) {
+            g_warning ("Failed to connect, phase 0");
+            break;
+        }
+
+        if (!socket_attempt_connect (socket, addr)) {
+            g_warning ("Failed to connect, %s", G_STRFUNC);
+            /* Try next */
+        } else {
+            break;
+        }
     }
 }
 
-#ifndef G_OS_WIN32
-  #define LM_SOCKET_FD_VALID(s) ((s) >= 0)
-#else 
-  #define LM_SOCKET_FD_VALID(s) ((s) != INVALID_SOCKET)
-#endif /* G_OS_WIN32 */
+#define IO_CONDITION_ALL (G_IO_OUT | G_IO_ERR | G_IO_IN | G_IO_PRI | G_IO_HUP)
 
-static void
-socket_set_fd_blocking (SocketHandle handle, gboolean block)
-{
-    int res;
-
-#ifndef G_OS_WIN32
-    res = fcntl (handle, F_SETFL, block ? 0 : O_NONBLOCK);
-#else  /* G_OS_WIN32 */
-    u_long mode = (block ? 0 : 1);
-    res = ioctlsocket (handle, FIONBIO, &mode);
-#endif /* G_OS_WIN32 */
-
-    if (res != 0) {
-        g_warning ("Could not set connection to be %s\n",
-                   block ? "blocking" : "non-blocking");
-    }
-}
-
-static SocketHandle
-socket_get_handle (LmSocket *socket)
-{
-    if (!LM_SOCKET_GET_CLASS(socket)->get_handle) {
-        g_assert_not_reached ();
-    }
-
-    return LM_SOCKET_GET_CLASS(socket)->get_handle (socket);
-}
-
-static void
-socket_real_connect (LmSocket *sock)
+static gboolean
+socket_attempt_connect (LmSocket *lm_socket, struct addrinfo *addr)
 {
     LmSocketPriv    *priv;
     int              res;
-    struct addrinfo *addr;
-    char             name[NI_MAXHOST];
-    char             portname[NI_MAXSERV];
 
-    priv = GET_PRIV (sock);
+    priv = GET_PRIV (lm_socket);
 
-    addr = lm_socket_address_iter_get_next (priv->sa_iter);
-    if (!addr) {
-        g_warning ("Failed to connect, phase 0");
-        return;
-    }
+    priv->handle = (LmSocketHandle)socket (addr->ai_family, 
+                                           addr->ai_socktype, 
+                                           addr->ai_protocol);
 
-    res = getnameinfo (addr->ai_addr,
-                       (socklen_t)addr->ai_addrlen,
-                       name, sizeof (name),
-                       portname, sizeof (portname),
-                       NI_NUMERICHOST | NI_NUMERICSERV);
-    if (res < 0) {
+    if (!_LM_SOCK_VALID (priv->handle)) {
         g_warning ("Failed to connect, phase 1");
-        return;
-    }
-
-    priv->handle = (SocketHandle)socket (addr->ai_family, 
-                                         addr->ai_socktype, 
-                                         addr->ai_protocol);
-
-    if (!LM_SOCKET_FD_VALID(priv->handle)) {
-        g_warning ("Failed to connect, phase 2");
-        return;
+        return FALSE;
     }
 
     priv->io_channel = g_io_channel_unix_new (priv->handle);
@@ -362,29 +332,90 @@ socket_real_connect (LmSocket *sock)
     g_io_channel_set_encoding (priv->io_channel, NULL, NULL);
     g_io_channel_set_buffered (priv->io_channel, FALSE);
 
-    socket_set_fd_blocking (priv->handle, FALSE);
+    _lm_sock_set_blocking (priv->handle, FALSE);
 
-    priv->connect_watch = lm_misc_add_io_watch (priv->context,
-                                                priv->io_channel,
-                                                G_IO_OUT | G_IO_ERR,
-                                                (GIOFunc) socket_connect_cb,
-                                                socket);
+    priv->io_watch = lm_misc_add_io_watch (priv->context,
+                                           priv->io_channel,
+                                           IO_CONDITION_ALL,
+                                           (GIOFunc) socket_io_cb,
+                                           socket);
 
     res = connect (priv->handle, addr->ai_addr, (int)addr->ai_addrlen);
     if (res < 0) {
-        g_warning ("Failed to connect, phase 3 (lm-old-socket.c:662)");
-        return;
+        int err;
+        err = _lm_sock_get_last_error ();
+        if (!_lm_sock_is_blocking_error (err)) {
+            g_warning ("Failed to connect, phase 2 (lm-old-socket.c:662)");
+            _lm_sock_close (priv->handle);
+            priv->handle = 0;
+            return FALSE;
+        }
     }
 
     /* TODO: Add a timeout here? */
+    return TRUE;
 }
 
 static gboolean
-socket_connect_cb (GIOChannel   *channel,
-                   GIOCondition  condition,
-                   LmSocket     *socket)
+socket_handle_connect_reply (LmSocket *socket, gboolean out_event)
 {
-    return FALSE;
+    LmSocketPriv *priv = GET_PRIV (socket);
+    
+    if (out_event) {
+        priv->connected = TRUE;
+        g_signal_emit (socket, signals[CONNECTED], 0);
+        return TRUE;
+    } else {
+        socklen_t len;
+        int       err;
+        len = sizeof (err);
+        _lm_sock_get_error (priv->handle, &err, &len);
+        if (!_lm_sock_is_blocking_error (err)) {
+            g_warning ("Connection failed\n");
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
+
+static gboolean
+socket_io_cb (GIOChannel   *channel,
+              GIOCondition  condition,
+              LmSocket     *socket)
+{
+    LmSocketPriv *priv = GET_PRIV (socket);
+    gboolean      ret_val = TRUE;
+
+    switch (condition) {
+        case G_IO_IN:
+        case G_IO_PRI:
+            g_signal_emit_by_name (socket, "readable");
+            break;
+        case G_IO_OUT:
+            if (priv->connected) {
+                g_signal_emit_by_name (socket, "writeable");
+            } else {
+                ret_val = !socket_handle_connect_reply (socket, TRUE);
+            }
+            break;
+        case G_IO_ERR:
+        case G_IO_NVAL:
+            if (priv->connected) {
+                g_signal_emit_by_name (socket, "disconnected", /* TODO: ERROR */ 0);
+                ret_val = FALSE;
+            } else {
+                ret_val = !socket_handle_connect_reply (socket, FALSE);
+            }
+            break;
+        case G_IO_HUP:
+            g_signal_emit_by_name (socket, "disconnected", /* TODO: HUP */ 0);
+            ret_val = FALSE;
+            /* TODO: Clean up */
+            break;
+    };
+
+    return ret_val;
 }
 
 /* -- Public API -- */
@@ -400,17 +431,20 @@ lm_socket_new (GMainContext *context, LmSocketAddress *address)
     return socket;
 }
 
-/* Support proxy here
- * LmSocket * lm_socket_new_with_proxy (LmSocketAddress *address); 
- */
-
 void
 lm_socket_connect (LmSocket *socket)
 {
-    if (!LM_SOCKET_GET_CLASS(socket)->connect) {
-        g_assert_not_reached ();
-    }
+    LmSocketPriv *priv;
 
-    LM_SOCKET_GET_CLASS(socket)->connect (socket);
+    priv = GET_PRIV (socket);
+
+    if (!lm_socket_address_is_resolved (priv->sa)) {
+        priv->resolver = lm_resolver_lookup_host (priv->context, priv->sa);
+        g_signal_connect (priv->resolver, "finished", 
+                          G_CALLBACK (socket_resolver_finished_cb),
+                          socket);
+    } else {
+        socket_attempt_connect_next (socket);
+    }
 }
 

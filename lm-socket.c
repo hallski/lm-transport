@@ -31,37 +31,32 @@
 #include <ws2tcpip.h>
 #endif /* G_OS_WIN32 */
 
+#include "lm-channel.h"
 #include "lm-marshal.h"
 #include "lm-misc.h"
 #include "lm-resolver.h"
+#include "lm-sock.h"
 #include "lm-socket.h"
-
-#ifndef G_OS_WIN32
-typedef int SocketHandle;
-#else  /* G_OS_WIN32 */
-typedef SOCKET SocketHandle;
-#endif /* G_OS_WIN32 */
 
 #define GET_PRIV(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), LM_TYPE_SOCKET, LmSocketPriv))
 
 typedef struct LmSocketPriv LmSocketPriv;
 struct LmSocketPriv {
-    GMainContext    *context;
-    LmSocketAddress *sa;
+    GMainContext        *context;
+    LmSocketAddress     *sa;
 
-    SocketHandle     handle;
-    GIOChannel      *io_channel;
+    LmSocketHandle       handle;
+    GIOChannel          *io_channel;
+    GSource             *io_watch;
 
     /* DNS Lookup */
-    LmResolver      *resolver;
+    LmResolver          *resolver;
 
     /* Connect */
     LmSocketAddressIter *sa_iter;
-    GSource             *connect_watch;
-
-    gint             my_prop;
 };
 
+static void      socket_channel_iface_init  (LmChannelIface    *iface);
 static void      socket_finalize            (GObject           *object);
 static void      socket_get_property        (GObject           *object,
                                              guint              param_id,
@@ -71,24 +66,22 @@ static void      socket_set_property        (GObject           *object,
                                              guint              param_id,
                                              const GValue      *value,
                                              GParamSpec        *pspec);
-static void      socket_do_connect          (LmSocket          *socket);
-static void      socket_do_close            (LmSocket          *socket);
-static GIOStatus socket_do_read             (LmSocket          *socket,
+static GIOStatus socket_read                (LmChannel         *channel,
                                              gchar             *buf,
                                              gsize              len,
                                              gsize             *read_len,
                                              GError           **error);
-static GIOStatus socket_do_write            (LmSocket          *socket,
-                                             gchar             *buf,
-                                             gsize              len,
+static GIOStatus socket_write               (LmChannel         *channel,
+                                             const gchar       *buf,
+                                             gssize             len,
                                              gsize             *written_len,
                                              GError           **error);
-static void      socket_real_connect        (LmSocket          *socket);
-static gboolean  socket_connect_cb          (GIOChannel        *channel,
-                                             GIOCondition       condition,
-                                             LmSocket          *socket);
+static void      socket_close               (LmChannel         *channel);
+static SocketHandle socket_get_handle       (LmSocket          *socket);
 
-G_DEFINE_TYPE (LmSocket, lm_socket, G_TYPE_OBJECT)
+G_DEFINE_TYPE_WITH_CODE (LmSocket, lm_socket, G_TYPE_OBJECT,
+                         G_IMPLEMENT_INTERFACE (LM_TYPE_CHANNEL,
+                                                socket_channel_iface_init))
 
 enum {
     PROP_0,
@@ -98,10 +91,6 @@ enum {
 
 enum {
     CONNECTED,
-    READABLE,
-    WRITABLE,
-    DISCONNECTED,
-    ERROR,
     LAST_SIGNAL
 };
 
@@ -112,11 +101,6 @@ lm_socket_class_init (LmSocketClass *class)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (class);
     GParamSpec   *pspec;
-
-    class->connect             = socket_do_connect;
-    class->close               = socket_do_close;
-    class->read                = socket_do_read;
-    class->write               = socket_do_write;
 
     object_class->finalize     = socket_finalize;
     object_class->get_property = socket_get_property;
@@ -144,42 +128,6 @@ lm_socket_class_init (LmSocketClass *class)
                       _lm_marshal_VOID__INT,
                       G_TYPE_NONE, 
                       1, G_TYPE_INT);
-     signals[DISCONNECTED] = 
-        g_signal_new ("disconnected",
-                      G_OBJECT_CLASS_TYPE (object_class),
-                      G_SIGNAL_RUN_LAST,
-                      0,
-                      NULL, NULL,
-                      _lm_marshal_VOID__INT,
-                      G_TYPE_NONE, 
-                      1, G_TYPE_INT);
-     signals[READABLE] = 
-        g_signal_new ("readable",
-                      G_OBJECT_CLASS_TYPE (object_class),
-                      G_SIGNAL_RUN_LAST,
-                      0,
-                      NULL, NULL,
-                      _lm_marshal_VOID__INT,
-                      G_TYPE_NONE, 
-                      1, G_TYPE_INT);
-    signals[WRITABLE] = 
-        g_signal_new ("writable",
-                      G_OBJECT_CLASS_TYPE (object_class),
-                      G_SIGNAL_RUN_LAST,
-                      0,
-                      NULL, NULL,
-                      _lm_marshal_VOID__INT,
-                      G_TYPE_NONE, 
-                      1, G_TYPE_INT);
-    signals[ERROR] = 
-        g_signal_new ("error",
-                      G_OBJECT_CLASS_TYPE (object_class),
-                      G_SIGNAL_RUN_LAST,
-                      0,
-                      NULL, NULL,
-                      _lm_marshal_VOID__INT,
-                      G_TYPE_NONE, 
-                      1, G_TYPE_INT);
     
     g_type_class_add_private (object_class, sizeof (LmSocketPriv));
 }
@@ -190,6 +138,14 @@ lm_socket_init (LmSocket *socket)
     LmSocketPriv *priv;
 
     priv = GET_PRIV (socket);
+}
+
+static void
+socket_channel_iface_init (LmChannelIface *iface)
+{
+    iface->read  = socket_read;
+    iface->write = socket_write;
+    iface->close = socket_close;
 }
 
 static void
@@ -258,6 +214,46 @@ socket_set_property (GObject      *object,
 }
 
 static void
+socket_close (LmChannel *channel)
+{
+    LmSocketPriv *priv;
+
+    priv = GET_PRIV (socket);
+
+    _lm_sock_close (priv->handle);
+}
+
+static GIOStatus
+socket_read (LmChannel *channel,
+             gchar     *buf,
+             gsize      len,
+             gsize     *read_len,
+             GError   **error)
+{
+    LmSocketPriv *priv;
+
+    priv = GET_PRIV (socket);
+
+    return g_io_channel_read_chars (priv->io_channel, 
+                                    buf, len, read_len, error);
+}
+
+static GIOStatus
+socket_write (LmChannel    *channel,
+              const gchar  *buf,
+              gssize        len,
+              gsize        *written_len,
+              GError      **error)
+{
+    LmSocketPriv *priv;
+
+    priv = GET_PRIV (socket);
+
+    return g_io_channel_write_chars (priv->io_channel,
+                                     buf, len, written_len, error);
+}
+
+static void
 socket_resolver_finished_cb (LmResolver       *resolver,
                              LmResolverResult  result,
                              LmSocketAddress  *address,
@@ -291,50 +287,6 @@ socket_do_connect (LmSocket *socket)
     }
 }
 
-static void
-socket_do_close (LmSocket *socket)
-{
-    LmSocketPriv *priv;
-
-    priv = GET_PRIV (socket);
-
-#ifndef G_OS_WIN32
-    close (priv->handle);
-#else  /* G_OS_WIN32 */
-    closesocket (priv->handle);
-#endif /* G_OS_WIN32 */
-}
-
-static GIOStatus
-socket_do_read (LmSocket  *socket,
-                gchar     *buf,
-                gsize      len,
-                gsize     *read_len,
-                GError   **error)
-{
-    LmSocketPriv *priv;
-
-    priv = GET_PRIV (socket);
-
-    return g_io_channel_read_chars (priv->io_channel, 
-                                    buf, len, read_len, error);
-}
-
-static GIOStatus
-socket_do_write (LmSocket  *socket,
-                 gchar     *buf,
-                 gsize      len,
-                 gsize     *written_len,
-                 GError   **error)
-{
-    LmSocketPriv *priv;
-
-    priv = GET_PRIV (socket);
-
-    return g_io_channel_write_chars (priv->io_channel,
-                                     buf, len, written_len, error);
-}
-
 #ifndef G_OS_WIN32
   #define LM_SOCKET_FD_VALID(s) ((s) >= 0)
 #else 
@@ -357,6 +309,16 @@ socket_set_fd_blocking (SocketHandle handle, gboolean block)
         g_warning ("Could not set connection to be %s\n",
                    block ? "blocking" : "non-blocking");
     }
+}
+
+static SocketHandle
+socket_get_handle (LmSocket *socket)
+{
+    if (!LM_SOCKET_GET_CLASS(socket)->get_handle) {
+        g_assert_not_reached ();
+    }
+
+    return LM_SOCKET_GET_CLASS(socket)->get_handle (socket);
 }
 
 static void
@@ -425,10 +387,9 @@ socket_connect_cb (GIOChannel   *channel,
     return FALSE;
 }
 
-
 /* -- Public API -- */
 LmSocket * 
-lm_socket_new (LmSocketAddress *address, GMainContext *context)
+lm_socket_new (GMainContext *context, LmSocketAddress *address)
 {
     LmSocket *socket;
 
@@ -451,48 +412,5 @@ lm_socket_connect (LmSocket *socket)
     }
 
     LM_SOCKET_GET_CLASS(socket)->connect (socket);
-}
-
-void
-lm_socket_close (LmSocket *socket)
-{
-    if (!LM_SOCKET_GET_CLASS(socket)->close) {
-        g_assert_not_reached ();
-    }
-
-    LM_SOCKET_GET_CLASS(socket)->close (socket);
-}
-
-GIOStatus
-lm_socket_read (LmSocket  *socket,
-                gchar     *buf,
-                gsize      len,
-                gsize     *read_len,
-                GError   **error)
-{
-     if (!LM_SOCKET_GET_CLASS(socket)->read) {
-         g_assert_not_reached ();
-     }
-
-     LM_SOCKET_GET_CLASS(socket)->read (socket, buf, len, read_len, error);
-
-     return G_IO_STATUS_NORMAL;
-}
-
-GIOStatus
-lm_socket_write (LmSocket  *socket,
-                 gchar     *buf,
-                 gsize      len,
-                 gsize     *written_len,
-                 GError   **error)
-{
-    if (!LM_SOCKET_GET_CLASS(socket)->write) {
-        g_assert_not_reached ();
-    }
-
-    LM_SOCKET_GET_CLASS(socket)->write (socket, buf, 
-                                        len, written_len, error);
-
-    return G_IO_STATUS_NORMAL;
 }
 

@@ -31,8 +31,10 @@ set(SOURCES
 	lm-misc.h
 	#lm-secure-socket.c
 	#lm-secure-socket.h
-	#lm-socket.c
-	#lm-socket.h
+	lm-sock.c
+	lm-sock.h
+	lm-socket.c
+	lm-socket.h
 	lm-socket-address.c
 	lm-socket-address.h
 	#lm-gnutls-socket.c

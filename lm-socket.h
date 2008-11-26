@@ -37,48 +37,32 @@ G_BEGIN_DECLS
 typedef struct LmSocket      LmSocket;
 typedef struct LmSocketClass LmSocketClass;
 
+#ifndef G_OS_WIN32
+typedef int SocketHandle;
+#else  /* G_OS_WIN32 */
+typedef SOCKET SocketHandle;
+#endif /* G_OS_WIN32 */
+
 struct LmSocket {
     GObject parent;
 };
 
 struct LmSocketClass {
     GObjectClass parent_class;
-    
+
     /* <vtable> */
-    void       (*connect)        (LmSocket        *socket);
-    void       (*close)          (LmSocket        *socket);
-    GIOStatus  (*read)           (LmSocket        *socket,
-                                  gchar           *buf,
-                                  gsize            len,
-                                  gsize           *read_len,
-                                  GError         **error);
-    GIOStatus  (*write)          (LmSocket        *socket,
-                                  gchar           *buf,
-                                  gsize            len,
-                                  gsize           *written_len,
-                                  GError         **error);
+    SocketHandle  (*get_handle)          (LmSocket *socket);
+    void          (*set_handle_blocking) (LmSocket *socket,
+                                          gboolean  block);
+    void          (*close_handle)        (LmSocket *socket);
 };
 
 GType      lm_socket_get_type  (void);
 
 LmSocket * lm_socket_new            (LmSocketAddress *address,
                                      GMainContext    *context);
-/* Support proxy here
- * LmSocket * lm_socket_new_with_proxy (LmSocketAddress *address); 
- */
 
 void       lm_socket_connect        (LmSocket        *socket);
-void       lm_socket_close          (LmSocket        *socket);
-GIOStatus  lm_socket_read           (LmSocket        *socket,
-                                     gchar           *buf,
-                                     gsize            len,
-                                     gsize           *read_len,
-                                     GError         **error);
-GIOStatus  lm_socket_write          (LmSocket        *socket,
-                                     gchar           *buf,
-                                     gsize            len,
-                                     gsize           *written_len,
-                                     GError         **error);
 
 G_END_DECLS
 

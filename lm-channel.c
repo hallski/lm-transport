@@ -27,6 +27,9 @@ static void    channel_base_init (LmChannelIface *iface);
 
 enum {
     READABLE,
+    WRITEABLE,
+    DISCONNECTED,
+    ERROR,
     LAST_SIGNAL
 };
 
@@ -70,6 +73,37 @@ channel_base_init (LmChannelIface *iface)
                           _lm_marshal_VOID__VOID,
                           G_TYPE_NONE,
                           0);
+
+        signals[WRITEABLE] =
+            g_signal_new ("writeable",
+                          LM_TYPE_CHANNEL,
+                          G_SIGNAL_RUN_LAST,
+                          0,
+                          NULL, NULL,
+                          _lm_marshal_VOID__VOID,
+                          G_TYPE_NONE,
+                          0);
+
+        signals[DISCONNECTED] =
+            g_signal_new ("disconnected",
+                          LM_TYPE_CHANNEL,
+                          G_SIGNAL_RUN_LAST,
+                          0,
+                          NULL, NULL,
+                          _lm_marshal_VOID__VOID,
+                          G_TYPE_NONE,
+                          0);
+
+        signals[ERROR] =
+            g_signal_new ("error",
+                          LM_TYPE_CHANNEL,
+                          G_SIGNAL_RUN_LAST,
+                          0,
+                          NULL, NULL,
+                          _lm_marshal_VOID__VOID,
+                          G_TYPE_NONE,
+                          0);
+
         initialized = TRUE;
     }
 }

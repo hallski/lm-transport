@@ -17,12 +17,44 @@ static GMainLoop *loop;
 #define MESSAGE "Hey there! Whazzup?"
 
 static void
+write_some (LmSocket *socket)
+{
+        static int foo = 0;
+        gchar *msg;
+
+        msg = g_strdup_printf ("Yay %d!", ++foo);
+
+        lm_channel_write (LM_CHANNEL (socket), 
+                          msg, (gssize)strlen (msg), NULL, NULL);
+
+        g_print ("Returning\n");
+}
+
+static void
+socket_readable (LmSocket *socket)
+{
+        char  buf[1024];
+        gsize read_len;
+
+        g_print ("Attempting to read\n");
+
+        lm_channel_read (LM_CHANNEL (socket),
+                         buf, 1023, &read_len, NULL);
+        buf[read_len] = '\0';
+
+        g_print ("Read: %s\n", buf);
+        write_some (socket);
+}
+
+static void
 socket_connected (LmSocket *socket, int res, gpointer user_data)
 {
         g_print ("Connect callback: %d\n", res);
 
         lm_channel_write (LM_CHANNEL (socket), 
                           MESSAGE, (gssize)strlen (MESSAGE), NULL, NULL);
+
+        g_print ("Returning\n");
 }
 
 int
@@ -48,6 +80,9 @@ main (int argc, char **argv)
         socket = lm_socket_new (NULL, sa);
         g_signal_connect (socket, "connect-result", 
                           G_CALLBACK (socket_connected),
+                          NULL);
+        g_signal_connect (socket, "readable",
+                          G_CALLBACK (socket_readable),
                           NULL);
         lm_socket_connect (socket);
 

@@ -318,7 +318,7 @@ socket_attempt_connect_next (LmSocket *socket)
     }
 }
 
-#define IO_CONDITION_ALL (G_IO_OUT | G_IO_ERR | G_IO_IN | G_IO_PRI | G_IO_HUP)
+#define IO_CONDITION_ALL (G_IO_OUT | G_IO_ERR)
 
 static gboolean
 socket_attempt_connect (LmSocket *lm_socket, struct addrinfo *addr)
@@ -372,6 +372,12 @@ socket_handle_connect_reply (LmSocket *socket, gboolean out_event)
     LmSocketPriv *priv = GET_PRIV (socket);
     
     if (out_event) {
+        priv->io_watch = lm_misc_add_io_watch (priv->context,
+                                               priv->io_channel,
+                                               G_IO_IN | G_IO_HUP | G_IO_ERR,
+                                               (GIOFunc) socket_io_cb,
+                                               socket);
+
         priv->connected = TRUE;
         socket_emit_connect_result (socket, TRUE);
         return TRUE;
@@ -396,10 +402,14 @@ socket_io_cb (GIOChannel   *channel,
 {
     LmSocketPriv *priv = GET_PRIV (socket);
     gboolean      ret_val = TRUE;
+            
+    g_print ("io_cb[%d] out=%d in=%d hup=%d\n", condition,
+             G_IO_OUT, G_IO_IN, G_IO_HUP);
 
     switch (condition) {
         case G_IO_IN:
         case G_IO_PRI:
+            g_print ("COND: Read\n");
             g_signal_emit_by_name (socket, "readable");
             break;
         case G_IO_OUT:

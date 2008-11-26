@@ -90,9 +90,9 @@ channel_base_init (LmChannelIface *iface)
                           G_SIGNAL_RUN_LAST,
                           0,
                           NULL, NULL,
-                          _lm_marshal_VOID__VOID,
+                          _lm_marshal_VOID__INT,
                           G_TYPE_NONE,
-                          0);
+                          1, G_TYPE_INT);
 
         signals[ERROR] =
             g_signal_new ("error",

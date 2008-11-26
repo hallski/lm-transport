@@ -57,6 +57,27 @@ socket_connected (LmSocket *socket, int res, gpointer user_data)
         g_print ("Returning\n");
 }
 
+static void
+socket_disconnected (LmSocket *socket, LmChannelDisconnectReason reason)
+{
+        g_print ("Disconnected due to: ");
+
+        switch (reason) {
+        case LM_CHANNEL_DISCONNECT_REQUESTED:
+                g_print ("User requested\n");
+                break;
+        case LM_CHANNEL_DISCONNECT_IO_ERROR:
+                g_print ("I/O Error\n");
+                break;
+        case LM_CHANNEL_DISCONNECT_HUP:
+                g_print ("HUP\n");
+                break;
+        };
+
+        g_free (host);
+        g_main_loop_quit (loop);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -84,6 +105,10 @@ main (int argc, char **argv)
         g_signal_connect (socket, "readable",
                           G_CALLBACK (socket_readable),
                           NULL);
+        g_signal_connect (socket, "disconnected",
+                          G_CALLBACK (socket_disconnected),
+                          NULL);
+
         lm_socket_connect (socket);
 
         loop = g_main_loop_new (NULL, FALSE);

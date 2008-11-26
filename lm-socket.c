@@ -300,6 +300,45 @@ socket_emit_connect_result (LmSocket *socket, LmSocketConnectResult result)
 }
 
 static void
+socket_disconnect_watch (GSource **watch) 
+{
+    if (*watch) {
+        g_source_destroy (*watch);
+        *watch = NULL;
+    }
+}
+
+static void
+socket_disconnect_io_watches (LmSocket *socket) 
+{
+    LmSocketPriv *priv = GET_PRIV (socket);
+
+    socket_disconnect_watch (&priv->watches.in_watch);
+    socket_disconnect_watch (&priv->watches.out_watch);
+    socket_disconnect_watch (&priv->watches.err_watch);
+    socket_disconnect_watch (&priv->watches.hup_watch);
+}
+
+static void
+socket_emit_disconnected_and_cleanup (LmSocket                  *socket,
+                                      LmChannelDisconnectReason  reason)
+{
+    LmSocketPriv *priv = GET_PRIV (socket);
+
+    g_signal_emit_by_name (socket, "disconnected", reason);
+
+    if (priv->io_channel) {
+        socket_disconnect_io_watches (socket);
+
+        g_io_channel_unref (priv->io_channel);
+        priv->io_channel = NULL;
+    }
+
+        
+    /* TODO: Cleanup */
+}
+
+static void
 socket_resolver_finished_cb (LmResolver       *resolver,
                              LmResolverResult  result,
                              LmSocketAddress  *address,
@@ -463,7 +502,8 @@ socket_err_cb (GIOChannel   *source,
             return FALSE;
         }
     } else {
-        g_signal_emit_by_name (socket, "disconnected", /* TODO: ERROR */ 0);
+        socket_emit_disconnected_and_cleanup (socket, 
+                                              LM_CHANNEL_DISCONNECT_IO_ERROR);
         return FALSE;
     }
 
@@ -475,8 +515,8 @@ socket_hup_cb (GIOChannel   *source,
                GIOCondition  condition,
                LmSocket     *socket)
 {
-    g_signal_emit_by_name (socket, "disconnected", /* TODO: HUP */ 0);
-
+    socket_emit_disconnected_and_cleanup (socket, LM_CHANNEL_DISCONNECT_HUP);
+    
     return FALSE;
 }
 

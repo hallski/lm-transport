@@ -60,6 +60,12 @@ struct _LmChannelIface {
     void       (*close)      (LmChannel    *channel);
 };
 
+typedef enum {
+    LM_CHANNEL_DISCONNECT_REQUESTED,
+    LM_CHANNEL_DISCONNECT_HUP,
+    LM_CHANNEL_DISCONNECT_IO_ERROR,
+} LmChannelDisconnectReason;
+
 GType          lm_channel_get_type          (void);
 
 GIOStatus      lm_channel_read              (LmChannel *channel,

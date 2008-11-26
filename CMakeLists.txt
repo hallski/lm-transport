@@ -34,6 +34,12 @@ set(SOURCES
 	lm-gnutls-socket.c
 	lm-openssl-socket.c
 	lm-openssl-socket.h
+	lm-resolver.c
+	lm-resolver.h
+	#	lm-asyncns-resolver.c
+	#lm-asyncns-resolver.h
+	#lm-blocking-resolver.c
+	#lm-blocking-resolver.h
 )
 
 add_executable(test test.c ${SOURCES})

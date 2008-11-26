@@ -40,6 +40,13 @@
 
 #define GET_PRIV(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), LM_TYPE_SOCKET, LmSocketPriv))
 
+typedef struct {
+    GSource *in_watch;
+    GSource *out_watch;
+    GSource *err_watch;
+    GSource *hup_watch;
+} IOWatches;
+
 typedef struct LmSocketPriv LmSocketPriv;
 struct LmSocketPriv {
     GMainContext        *context;
@@ -47,7 +54,7 @@ struct LmSocketPriv {
 
     LmSocketHandle       handle;
     GIOChannel          *io_channel;
-    GSource             *io_watch;
+    IOWatches            watches;
 
     gboolean             connected;
 
@@ -82,10 +89,16 @@ static void      socket_close               (LmChannel         *channel);
 static void      socket_attempt_connect_next(LmSocket          *socket);
 static gboolean  socket_attempt_connect     (LmSocket          *socket,
                                              struct addrinfo   *addr);
-static gboolean  socket_io_cb               (GIOChannel        *channel,
+static gboolean  socket_in_cb               (GIOChannel        *source,
                                              GIOCondition       condition,
                                              LmSocket          *socket);
-static gboolean  socket_connect_cb          (GIOChannel        *channel,
+static gboolean  socket_out_cb              (GIOChannel        *source,
+                                             GIOCondition       condition,
+                                             LmSocket          *socket);
+static gboolean  socket_err_cb              (GIOChannel        *source,
+                                             GIOCondition       condition,
+                                             LmSocket          *socket);
+static gboolean  socket_hup_cb              (GIOChannel        *source,
                                              GIOCondition       condition,
                                              LmSocket          *socket);
 
@@ -295,6 +308,7 @@ socket_resolver_finished_cb (LmResolver       *resolver,
     if (result != LM_RESOLVER_RESULT_OK) {
         g_warning ("Failed to lookup host: %s\n",
                    lm_socket_address_get_host (address));
+
         socket_emit_connect_result (socket, 
                                     LM_SOCKET_CONNECT_FAILED_DNS);
 
@@ -327,6 +341,10 @@ socket_attempt_connect_next (LmSocket *socket)
             g_warning ("Failed to connect, trying next, %s", G_STRFUNC);
             /* Try next */
         } else {
+            /* Creating the socket and attempting to connect it worked,
+             * next step will be socket_connect_cb that will be triggered by
+             * either G_IO_OUT or G_IO_ERR.
+             */
             break;
         }
     }
@@ -356,11 +374,17 @@ socket_attempt_connect (LmSocket *lm_socket, struct addrinfo *addr)
 
     _lm_sock_set_blocking (priv->handle, FALSE);
 
-    priv->io_watch = lm_misc_add_io_watch (priv->context,
-                                           priv->io_channel,
-                                           G_IO_OUT | G_IO_ERR,
-                                           (GIOFunc) socket_connect_cb,
-                                           lm_socket);
+    priv->watches.out_watch = lm_misc_add_io_watch (priv->context,
+                                                    priv->io_channel,
+                                                    G_IO_OUT,
+                                                    (GIOFunc) socket_out_cb,
+                                                    lm_socket);
+
+    priv->watches.err_watch = lm_misc_add_io_watch (priv->context,
+                                                    priv->io_channel,
+                                                    G_IO_ERR,
+                                                    (GIOFunc) socket_err_cb,
+                                                    lm_socket);
 
     res = connect (priv->handle, addr->ai_addr, (int)addr->ai_addrlen);
     if (res < 0) {
@@ -379,41 +403,58 @@ socket_attempt_connect (LmSocket *lm_socket, struct addrinfo *addr)
 }
 
 static gboolean
-socket_io_cb (GIOChannel   *source,
+socket_in_cb (GIOChannel   *source,
               GIOCondition  condition,
               LmSocket     *socket)
 {
-    if (condition & G_IO_IN) {
-        g_signal_emit_by_name (socket, "readable");
-    }
+    g_signal_emit_by_name (socket, "readable");
+    
+    return TRUE;
+}
 
-    if (condition & G_IO_OUT) {
+static gboolean
+socket_out_cb (GIOChannel   *source,
+               GIOCondition  condition,
+               LmSocket     *socket)
+{
+    LmSocketPriv *priv = GET_PRIV (socket);
+
+    if (priv->connected) {
         g_signal_emit_by_name (socket, "writeable");
-    }
+    } else {
+        /* Sucessful connect */
+        priv->watches.in_watch = 
+            lm_misc_add_io_watch (priv->context,
+                                  priv->io_channel,
+                                  G_IO_IN,
+                                  (GIOFunc) socket_in_cb,
+                                  socket);
 
-    if (condition & G_IO_HUP) {
-        g_signal_emit_by_name (socket, "disconnected", /* TODO: HUP */ 0);
-    }
+        priv->watches.hup_watch =
+            lm_misc_add_io_watch (priv->context,
+                                  priv->io_channel,
+                                  G_IO_HUP,
+                                  (GIOFunc) socket_hup_cb,
+                                  socket);
 
-    if (condition & G_IO_ERR) {
-        g_signal_emit_by_name (socket, "disconnected", /* TODO: ERROR */ 0);
+        priv->connected = TRUE;
+        socket_emit_connect_result (socket, LM_SOCKET_CONNECT_OK);
     }
 
     return TRUE;
 }
 
 static gboolean
-socket_connect_cb (GIOChannel   *channel,
-                   GIOCondition  condition,
-                   LmSocket     *socket)
+socket_err_cb (GIOChannel   *source,
+               GIOCondition  condition,
+               LmSocket     *socket)
 {
     LmSocketPriv *priv = GET_PRIV (socket);
 
-    /* Will only get G_IO_OUT or G_IO_ERR */
-
-    if (condition == G_IO_ERR) {
+    if (!priv->connected) {
         socklen_t len;
         int       err;
+
         len = sizeof (err);
         _lm_sock_get_error (priv->handle, &err, &len);
         if (!_lm_sock_is_blocking_error (err)) {
@@ -422,27 +463,21 @@ socket_connect_cb (GIOChannel   *channel,
             return FALSE;
         }
     } else {
-        g_source_destroy (priv->io_watch);
-
-        /* FIXME: if we add these (HUP and ERR), we don't get ANY
-         * response from the server, this is to do with the way that
-         * windows handles watches, see bug #331214.
-         *
-         * Is it fine if we leave the G_IO_OUT and G_IO_HUP from connect? 
-         */
-
-        priv->io_watch = 
-            lm_misc_add_io_watch (priv->context,
-                                  priv->io_channel,
-                                  G_IO_IN | G_IO_OUT | G_IO_ERR | G_IO_HUP,
-                                  (GIOFunc) socket_io_cb,
-                                  socket);
-
-        priv->connected = TRUE;
-        socket_emit_connect_result (socket, LM_SOCKET_CONNECT_OK);
+        g_signal_emit_by_name (socket, "disconnected", /* TODO: ERROR */ 0);
+        return FALSE;
     }
 
     return TRUE;
+}
+
+static gboolean
+socket_hup_cb (GIOChannel   *source,
+               GIOCondition  condition,
+               LmSocket     *socket)
+{
+    g_signal_emit_by_name (socket, "disconnected", /* TODO: HUP */ 0);
+
+    return FALSE;
 }
 
 /* -- Public API -- */

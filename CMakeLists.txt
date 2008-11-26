@@ -17,6 +17,8 @@ pkg_check_modules(LM REQUIRED
 set(SOURCES
 	asyncns.c
 	asyncns.h
+	lm-channel.c
+	lm-channel.h
 	lm-dummy.c
 	lm-dummy.h
 	lm-error.c
@@ -27,15 +29,15 @@ set(SOURCES
 	lm-marshal.h
 	lm-misc.c
 	lm-misc.h
-	lm-secure-socket.c
-	lm-secure-socket.h
-	lm-socket.c
-	lm-socket.h
+	#lm-secure-socket.c
+	#lm-secure-socket.h
+	#lm-socket.c
+	#lm-socket.h
 	lm-socket-address.c
 	lm-socket-address.h
-	lm-gnutls-socket.c
-	lm-openssl-socket.c
-	lm-openssl-socket.h
+	#lm-gnutls-socket.c
+	#lm-openssl-socket.c
+	#lm-openssl-socket.h
 	lm-resolver.c
 	lm-resolver.h
 	lm-asyncns-resolver.c

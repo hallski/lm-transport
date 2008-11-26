@@ -45,12 +45,10 @@ struct LmResolverClass {
     GObjectClass parent_class;
     
     /* <vtable> */
-    gboolean    (*lookup_host)   (LmResolver       *resolver,
-                                  LmSocketAddress  *sa,
-                                  GError          **error);
-    gboolean    (*lookup_srv)    (LmResolver       *resolver,
-                                  const gchar      *srv_str,
-                                  GError          **error);
+    void        (*lookup_host)   (LmResolver       *resolver,
+                                  LmSocketAddress  *sa);
+    void        (*lookup_srv)    (LmResolver       *resolver,
+                                  const gchar      *srv_str);
     void        (*cancel)        (LmResolver       *resolver);
 };
 
@@ -66,12 +64,10 @@ typedef enum {
 GType          lm_resolver_get_type          (void);
 
 LmResolver *   lm_resolver_lookup_host       (GMainContext     *context,
-                                              LmSocketAddress  *sa,
-                                              GError          **error);
+                                              LmSocketAddress  *sa);
 LmResolver *   lm_resolver_lookup_service    (GMainContext     *context,
                                               const gchar      *domain,
-                                              const gchar      *srv,
-                                              GError          **error);
+                                              const gchar      *srv);
 void           lm_resolver_cancel            (LmResolver       *resolver);
 
 

@@ -6,7 +6,8 @@
 
 #include "lm-resolver.h"
 
-static gchar *domain;
+static gchar     *domain;
+static GMainLoop *loop;
 
 static void
 resolver_finished_cb (LmResolver       *resolver, 
@@ -20,13 +21,14 @@ resolver_finished_cb (LmResolver       *resolver,
                  lm_socket_address_get_port (sa));
 
         g_free (domain);
+
+        g_main_loop_quit (loop);
 }
 
 int
 main (int argc, char **argv)
 {
-        GMainLoop       *loop;
-        LmResolver      *resolver;
+        LmResolver *resolver;
 
         g_type_init ();
 
@@ -37,12 +39,11 @@ main (int argc, char **argv)
 
         domain = g_strdup (argv[1]);
 
-        g_print ("Connecting to %s ...\n", domain);
+        g_print ("Looking up %s ...\n", domain);
 
         resolver = lm_resolver_lookup_service (NULL,
                                                domain,
-                                               LM_RESOLVER_SRV_XMPP_CLIENT,
-                                               NULL);
+                                               LM_RESOLVER_SRV_XMPP_CLIENT);
         g_signal_connect (resolver, "finished", G_CALLBACK (resolver_finished_cb),
                           NULL);
 

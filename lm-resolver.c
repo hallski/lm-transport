@@ -171,8 +171,7 @@ resolver_create (GMainContext *context)
 
 LmResolver *
 lm_resolver_lookup_host (GMainContext     *context,
-                         LmSocketAddress  *sa, 
-                         GError          **error)
+                         LmSocketAddress  *sa)
 {
     LmResolver *resolver;
 
@@ -182,12 +181,8 @@ lm_resolver_lookup_host (GMainContext     *context,
         g_assert_not_reached ();
     }
 
-    if (LM_RESOLVER_GET_CLASS(resolver)->lookup_host (resolver, 
-                                                      sa, error) == FALSE) {
-        g_object_unref (resolver);
-        return NULL;
-    }
-
+    LM_RESOLVER_GET_CLASS(resolver)->lookup_host (resolver, sa);
+    
     return resolver;
 }
 
@@ -206,12 +201,10 @@ resolver_create_srv_string (const gchar *domain,
 LmResolver *
 lm_resolver_lookup_service (GMainContext  *context,
                             const gchar   *domain,
-                            const gchar   *srv,
-                            GError       **error)
+                            const gchar   *srv)
 {
     LmResolver *resolver;
     gchar      *srv_str;
-    gboolean    lookup_result;
 
     g_return_val_if_fail (domain != NULL, FALSE);
     g_return_val_if_fail (srv != NULL, FALSE);
@@ -223,18 +216,11 @@ lm_resolver_lookup_service (GMainContext  *context,
     }
 
     srv_str = resolver_create_srv_string (domain, srv, "tcp");
-
-    lookup_result = LM_RESOLVER_GET_CLASS(resolver)->lookup_srv (resolver, 
-                                                                 srv_str, error);
+    
+    LM_RESOLVER_GET_CLASS(resolver)->lookup_srv (resolver, srv_str);
     
     g_free (srv_str);
    
-    if (lookup_result == FALSE) {
-        g_object_unref (resolver);
-        return NULL;
-    }
-
-
     return resolver;
 }
 

@@ -61,12 +61,10 @@ static void     asyncns_resolver_finalize      (GObject          *object);
 static void     asyncns_resolver_cleanup       (LmResolver       *resolver);
 static void     asyncns_resolver_host_done     (LmResolver       *resolver);
 static void     asyncns_resolver_srv_done      (LmResolver       *resolver);
-static gboolean asyncns_resolver_lookup_host   (LmResolver       *resolver,
-                                                LmSocketAddress  *sa,
-                                                GError          **error);
-static gboolean asyncns_resolver_lookup_srv    (LmResolver       *resolver,
-                                                const gchar      *srv,
-                                                GError          **error);
+static void     asyncns_resolver_lookup_host   (LmResolver       *resolver,
+                                                LmSocketAddress  *sa);
+static void     asyncns_resolver_lookup_srv    (LmResolver       *resolver,
+                                                const gchar      *srv);
 static void     asyncns_resolver_cancel        (LmResolver       *resolver);
 
 G_DEFINE_TYPE (LmAsyncnsResolver, lm_asyncns_resolver, LM_TYPE_RESOLVER)
@@ -164,8 +162,7 @@ asyncns_resolver_io_cb (GSource      *source,
 
 static gboolean
 asyncns_resolver_prep (LmResolver  *resolver, 
-                       int          resolve_type,
-                       GError     **error)
+                       int          resolve_type)
 {
     LmAsyncnsResolverPriv *priv = GET_PRIV (resolver);
     GMainContext          *context;
@@ -177,10 +174,7 @@ asyncns_resolver_prep (LmResolver  *resolver,
 
     priv->asyncns_ctx = asyncns_new (1);
     if (priv->asyncns_ctx == NULL) {
-        g_set_error (error,
-                     LM_ERROR,                 
-                     LM_ERROR_CONNECTION_FAILED,   
-                     "can't initialise libasyncns");
+        g_warning ("can't initialise libasyncns");
         return FALSE;
     }
 
@@ -276,20 +270,19 @@ asyncns_resolver_srv_done (LmResolver *resolver)
     asyncns_resolver_finished (resolver, result);
 }
 
-static gboolean
+static void
 asyncns_resolver_lookup_host (LmResolver       *resolver,
-                              LmSocketAddress  *sa,
-                              GError          **error)
+                              LmSocketAddress  *sa)
 {
     LmAsyncnsResolverPriv *priv;
     struct addrinfo        req;
 
-    g_return_val_if_fail (LM_IS_ASYNCNS_RESOLVER (resolver), FALSE);
-    g_return_val_if_fail (sa != NULL, FALSE);
+    g_return_if_fail (LM_IS_ASYNCNS_RESOLVER (resolver));
+    g_return_if_fail (sa != NULL);
 
-    if (!asyncns_resolver_prep (resolver, RESOLVE_TYPE_HOST, error)) {
+    if (!asyncns_resolver_prep (resolver, RESOLVE_TYPE_HOST)) {
         g_warning ("Failed to initialize the asyncns library");
-        return FALSE;
+        return;
     }
 
     memset (&req, 0, sizeof(req));
@@ -301,31 +294,26 @@ asyncns_resolver_lookup_host (LmResolver       *resolver,
                                               lm_socket_address_get_host (sa),
                                               NULL,
                                               &req);
-
-    return TRUE;
 }
 
-static gboolean
+static void
 asyncns_resolver_lookup_srv (LmResolver   *resolver, 
-                             const gchar  *srv,
-                             GError      **error)
+                             const gchar  *srv)
 {
     LmAsyncnsResolverPriv *priv;
     
-    g_return_val_if_fail (LM_IS_ASYNCNS_RESOLVER (resolver), FALSE);
-    g_return_val_if_fail (srv != NULL, FALSE);
+    g_return_if_fail (LM_IS_ASYNCNS_RESOLVER (resolver));
+    g_return_if_fail (srv != NULL);
 
     priv = GET_PRIV (resolver);
 
-    if (!asyncns_resolver_prep (resolver, RESOLVE_TYPE_SRV, error)) {
+    if (!asyncns_resolver_prep (resolver, RESOLVE_TYPE_SRV)) {
         g_warning ("Failed to initialize the asyncns library");
-        return FALSE;
+        return;
     }
 
     priv->resolv_query = asyncns_res_query (priv->asyncns_ctx, 
                                             srv, C_IN, T_SRV);
-
-    return TRUE;
 }
 
 static void

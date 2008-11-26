@@ -50,12 +50,10 @@ struct LmBlockingResolverPriv {
 };
 
 static void     blocking_resolver_finalize    (GObject          *object);
-static gboolean blocking_resolver_lookup_host (LmResolver       *resolver,
-                                               LmSocketAddress  *sa,
-                                               GError          **error);
-static gboolean blocking_resolver_lookup_srv  (LmResolver       *resolver,
-                                               const gchar      *srv,
-                                               GError          **error);
+static void     blocking_resolver_lookup_host (LmResolver       *resolver,
+                                               LmSocketAddress  *sa);
+static void     blocking_resolver_lookup_srv  (LmResolver       *resolver,
+                                               const gchar      *srv);
 static void     blocking_resolver_cancel      (LmResolver       *resolver);
 
 
@@ -188,16 +186,14 @@ blocking_resolver_idle_lookup_srv (LmBlockingResolver *resolver)
     return FALSE;
 }
 
-static gboolean
-blocking_resolver_lookup_host (LmResolver       *resolver,
-                               LmSocketAddress  *sa,
-                               GError          **error)
+static void
+blocking_resolver_lookup_host (LmResolver *resolver, LmSocketAddress *sa)
 {
     LmBlockingResolverPriv *priv;
     GMainContext           *context;
 
-    g_return_val_if_fail (LM_IS_BLOCKING_RESOLVER (resolver), FALSE);
-    g_return_val_if_fail (sa != NULL, FALSE);
+    g_return_if_fail (LM_IS_BLOCKING_RESOLVER (resolver));
+    g_return_if_fail (sa != NULL);
 
     priv = GET_PRIV (resolver);
 
@@ -208,20 +204,17 @@ blocking_resolver_lookup_host (LmResolver       *resolver,
     priv->idle_source = lm_misc_add_idle (context, 
                                           (GSourceFunc) blocking_resolver_idle_lookup_host,
                                           resolver);
-
-    return TRUE;
 }
 
-static gboolean
+static void
 blocking_resolver_lookup_srv (LmResolver   *resolver,
-                              const gchar  *srv,
-                              GError      **error)
+                              const gchar  *srv)
 {
     LmBlockingResolverPriv *priv;
     GMainContext           *context;
 
-    g_return_val_if_fail (LM_IS_BLOCKING_RESOLVER (resolver), FALSE);
-    g_return_val_if_fail (srv != NULL, FALSE);
+    g_return_if_fail (LM_IS_BLOCKING_RESOLVER (resolver));
+    g_return_if_fail (srv != NULL);
 
     priv = GET_PRIV (resolver);
 
@@ -232,8 +225,6 @@ blocking_resolver_lookup_srv (LmResolver   *resolver,
     priv->idle_source = lm_misc_add_idle (context, 
                                           (GSourceFunc) blocking_resolver_idle_lookup_srv,
                                           resolver);
-
-    return TRUE;
 }
 
 static void

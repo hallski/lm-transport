@@ -101,6 +101,10 @@ static gboolean  socket_err_cb              (GIOChannel        *source,
 static gboolean  socket_hup_cb              (GIOChannel        *source,
                                              GIOCondition       condition,
                                              LmSocket          *socket);
+static void      socket_reset               (LmSocket          *socket);
+static void      
+socket_emit_disconnected_and_cleanup        (LmSocket                  *socket,
+                                             LmChannelDisconnectReason  reason);
 
 G_DEFINE_TYPE_WITH_CODE (LmSocket, lm_socket, G_TYPE_OBJECT,
                          G_IMPLEMENT_INTERFACE (LM_TYPE_CHANNEL,
@@ -184,9 +188,7 @@ socket_finalize (GObject *object)
         lm_socket_address_unref (priv->sa);
     }
 
-    if (priv->connected) {
-        /* TODO: disconnect and what not */
-    }
+    socket_reset (LM_SOCKET (object));
 
     (G_OBJECT_CLASS (lm_socket_parent_class)->finalize) (object);
 }
@@ -252,7 +254,8 @@ socket_close (LmChannel *channel)
 
     priv = GET_PRIV (channel);
 
-    _lm_sock_close (priv->handle);
+    socket_emit_disconnected_and_cleanup (LM_SOCKET (channel), 
+                                          LM_CHANNEL_DISCONNECT_REQUESTED);
 }
 
 static GIOStatus
@@ -320,12 +323,12 @@ socket_disconnect_io_watches (LmSocket *socket)
 }
 
 static void
-socket_emit_disconnected_and_cleanup (LmSocket                  *socket,
-                                      LmChannelDisconnectReason  reason)
+socket_reset (LmSocket *socket)
 {
     LmSocketPriv *priv = GET_PRIV (socket);
 
-    g_signal_emit_by_name (socket, "disconnected", reason);
+    priv->connected = FALSE;
+    priv->sa_iter = NULL;
 
     if (priv->io_channel) {
         socket_disconnect_io_watches (socket);
@@ -334,8 +337,17 @@ socket_emit_disconnected_and_cleanup (LmSocket                  *socket,
         priv->io_channel = NULL;
     }
 
-        
-    /* TODO: Cleanup */
+    _lm_sock_close (priv->handle);
+    priv->handle = 0;
+}
+
+static void
+socket_emit_disconnected_and_cleanup (LmSocket                  *socket,
+                                      LmChannelDisconnectReason  reason)
+{
+    g_signal_emit_by_name (socket, "disconnected", reason);
+    
+    socket_reset (socket);
 }
 
 static void
@@ -413,6 +425,9 @@ socket_attempt_connect (LmSocket *lm_socket, struct addrinfo *addr)
 
     _lm_sock_set_blocking (priv->handle, FALSE);
 
+    /* Check for OUT and ERR events as they will define when the asynchronous 
+     * connect is done 
+     */
     priv->watches.out_watch = lm_misc_add_io_watch (priv->context,
                                                     priv->io_channel,
                                                     G_IO_OUT,

@@ -85,6 +85,9 @@ lm_socket_address_get_result_iter (LmSocketAddress *sa)
         sa->results_iter = g_slice_new0 (LmSocketAddressIter);
         sa->results_iter->sa = sa;
         sa->results_iter->current = sa->results;
+    } else {
+        /* Just reset it */
+        sa->results_iter->current = sa->results;
     }
 
     return sa->results_iter;

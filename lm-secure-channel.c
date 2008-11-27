@@ -59,14 +59,6 @@ static GIOStatus   secure_channel_write       (LmChannel         *channel,
                                                GError           **error);
 static void        secure_channel_close       (LmChannel         *channel);
 static LmChannel * secure_channel_get_inner   (LmChannel         *channel);
-static void        secure_channel_inner_readable_cb     (LmChannel   *inner,
-                                                         LmChannel   *channel);
-static void        secure_channel_inner_writeable_cb    (LmChannel   *inner,
-                                                         LmChannel   *channel);
-static void 
-secure_channel_inner_disconnected_cb      (LmChannel            *inner,
-                                           LmChannelCloseReason  reason,
-                                           LmChannel            *channel);
 
 G_DEFINE_TYPE_WITH_CODE (LmSecureChannel, lm_secure_channel, G_TYPE_OBJECT,
                          G_IMPLEMENT_INTERFACE (LM_TYPE_CHANNEL,
@@ -279,11 +271,11 @@ secure_channel_inner_writeable_cb (LmChannel *inner, LmChannel *channel)
 }
 
 static void
-secure_channel_inner_disconnected_cb (LmChannel            *inner, 
-                                      LmChannelCloseReason  reason,
-                                      LmChannel            *channel)
+secure_channel_inner_closed_cb (LmChannel            *inner, 
+                                LmChannelCloseReason  reason,
+                                LmChannel            *channel)
 {
-    g_signal_emit_by_name (channel, "disconnected", reason);
+    g_signal_emit_by_name (channel, "closed", reason);
 }
 
 LmChannel *
@@ -305,8 +297,8 @@ lm_secure_channel_new (GMainContext *context, LmChannel *inner_channel)
                       G_CALLBACK (secure_channel_inner_writeable_cb),
                       channel);
 
-    g_signal_connect (priv->inner_channel, "disconnected",
-                      G_CALLBACK (secure_channel_inner_disconnected_cb),
+    g_signal_connect (priv->inner_channel, "closed",
+                      G_CALLBACK (secure_channel_inner_closed_cb),
                       channel);
 
     return channel;

@@ -61,9 +61,9 @@ socket_connected (LmSocket *socket, int res, gpointer user_data)
 }
 
 static void
-socket_disconnected (LmSocket *socket, LmChannelCloseReason reason)
+socket_closed (LmSocket *socket, LmChannelCloseReason reason)
 {
-        g_print ("Disconnected due to: ");
+        g_print ("Closed due to: ");
 
         switch (reason) {
         case LM_CHANNEL_CLOSE_REQUESTED:
@@ -113,8 +113,8 @@ main (int argc, char **argv)
         g_signal_connect (secure, "readable",
                           G_CALLBACK (socket_readable),
                           NULL);
-        g_signal_connect (secure, "disconnected",
-                          G_CALLBACK (socket_disconnected),
+        g_signal_connect (secure, "closed",
+                          G_CALLBACK (socket_closed),
                           NULL);
 
         loop = g_main_loop_new (NULL, FALSE);

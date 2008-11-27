@@ -259,6 +259,12 @@ secure_channel_get_inner (LmChannel *channel)
 }
 
 static void
+secure_channel_inner_opened_cb (LmChannel *inner, LmChannel *channel)
+{
+    g_signal_emit_by_name (channel, "opened");
+}
+
+static void
 secure_channel_inner_readable_cb (LmChannel *inner, LmChannel *channel)
 {
     g_signal_emit_by_name (channel, "readable");
@@ -288,6 +294,10 @@ lm_secure_channel_new (GMainContext *context, LmChannel *inner_channel)
     priv    = GET_PRIV (channel);
 
     priv->inner_channel = g_object_ref (inner_channel);
+
+    g_signal_connect (priv->inner_channel, "opened",
+                      G_CALLBACK (secure_channel_inner_opened_cb),
+                      channel);
 
     g_signal_connect (priv->inner_channel, "readable",
                       G_CALLBACK (secure_channel_inner_readable_cb),

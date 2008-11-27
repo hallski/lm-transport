@@ -310,6 +310,10 @@ static void
 socket_emit_connect_result (LmSocket *socket, LmSocketConnectResult result)
 {
     g_signal_emit (socket, signals[CONNECT_RESULT], 0, result);
+    if (result == LM_SOCKET_CONNECT_OK) {
+        /* Emit the channel opened event too */
+        g_signal_emit_by_name (socket, "opened");
+    }
 }
 
 static void

@@ -49,12 +49,17 @@ struct LmSecureChannelClass {
     GObjectClass parent_class;
     
     /* <vtable> */
-    void  (*initialize)    (LmSecureChannel     *secure_channel,
-                            const char *username,
-                            const char *server,
-                            const char *password);
-    void  (*begin)         (LmSecureChannel     *secure_channel);
-    void  (*cancel)        (LmSecureChannel     *secure_channel);
+    GIOStatus   (*secure_read)       (LmChannel    *channel,
+                                      gchar        *buf,
+                                      gsize         count,
+                                      gsize        *bytes_read,
+                                      GError      **error);
+    GIOStatus   (*secure_write)      (LmChannel    *channel,
+                                      const gchar  *buf,
+                                      gssize        count,
+                                      gsize        *bytes_written,
+                                      GError      **error);
+    void        (*secure_close)      (LmChannel    *channel);
 };
 
 GType   lm_secure_channel_get_type        (void);
@@ -66,7 +71,9 @@ GType   lm_secure_channel_get_type        (void);
  *
  */
 
-void    lm_secure_channel_start_handshake (LmSecureChannel *channel);
+void          lm_secure_channel_start_handshake (LmSecureChannel *channel);
+
+const gchar * lm_secure_channel_get_fingerprint (LmSecureChannel *channel);
 
 G_END_DECLS
 

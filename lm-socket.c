@@ -86,7 +86,9 @@ static GIOStatus socket_write               (LmChannel         *channel,
                                              gsize             *written_len,
                                              GError           **error);
 static void      socket_close               (LmChannel         *channel);
-static void      socket_attempt_connect_next(LmSocket          *socket);
+static LmChannel * socket_get_inner         (LmChannel         *channel);
+static void      
+socket_attempt_connect_next                 (LmSocket          *socket);
 static gboolean  socket_attempt_connect     (LmSocket          *socket,
                                              struct addrinfo   *addr);
 static gboolean  socket_in_cb               (GIOChannel        *source,
@@ -172,9 +174,10 @@ lm_socket_init (LmSocket *socket)
 static void
 socket_channel_iface_init (LmChannelIface *iface)
 {
-    iface->read  = socket_read;
-    iface->write = socket_write;
-    iface->close = socket_close;
+    iface->read      = socket_read;
+    iface->write     = socket_write;
+    iface->close     = socket_close;
+    iface->get_inner = socket_get_inner;
 }
 
 static void
@@ -247,17 +250,6 @@ socket_set_property (GObject      *object,
     };
 }
 
-static void
-socket_close (LmChannel *channel)
-{
-    LmSocketPriv *priv;
-
-    priv = GET_PRIV (channel);
-
-    socket_emit_disconnected_and_cleanup (LM_SOCKET (channel), 
-                                          LM_CHANNEL_DISCONNECT_REQUESTED);
-}
-
 static GIOStatus
 socket_read (LmChannel *channel,
              gchar     *buf,
@@ -294,6 +286,24 @@ socket_write (LmChannel    *channel,
 
     return g_io_channel_write_chars (priv->io_channel,
                                      buf, len, written_len, error);
+}
+
+static void
+socket_close (LmChannel *channel)
+{
+    LmSocketPriv *priv;
+
+    priv = GET_PRIV (channel);
+
+    socket_emit_disconnected_and_cleanup (LM_SOCKET (channel), 
+                                          LM_CHANNEL_DISCONNECT_REQUESTED);
+}
+
+static LmChannel *
+socket_get_inner (LmChannel *channel)
+{
+    /* An LmSocket is the end station and it will never have an inner channel */
+    return NULL;
 }
 
 static void

@@ -154,3 +154,16 @@ lm_channel_close (LmChannel *channel)
     return LM_CHANNEL_GET_IFACE(channel)->close (channel);
 }
 
+LmChannel *
+lm_channel_get_inner (LmChannel *channel)
+{
+    g_return_val_if_fail (LM_IS_CHANNEL (channel), NULL);
+
+    if (!LM_CHANNEL_GET_IFACE(channel)->get_inner) {
+        g_assert_not_reached ();
+    }
+
+    return LM_CHANNEL_GET_IFACE(channel)->get_inner (channel);
+}
+
+

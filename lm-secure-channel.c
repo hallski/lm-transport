@@ -20,6 +20,7 @@
 
 #include <config.h>
 
+#include "lm-channel.h"
 #include "lm-marshal.h"
 #include "lm-secure-channel.h"
 
@@ -27,28 +28,51 @@
 
 typedef struct LmSecureChannelPriv LmSecureChannelPriv;
 struct LmSecureChannelPriv {
+    gchar    *expected_fingerprint;
+    gchar    *fingerprint;
+
+    gboolean  encrypted;
+
     gint my_prop;
 };
 
-static void     secure_channel_finalize            (GObject           *object);
-static void     secure_channel_get_property        (GObject           *object,
-                                           guint              param_id,
-                                           GValue            *value,
-                                           GParamSpec        *pspec);
-static void     secure_channel_set_property        (GObject           *object,
-                                           guint              param_id,
-                                           const GValue      *value,
-                                           GParamSpec        *pspec);
+static void     secure_channel_iface_init   (LmChannelIface    *iface);
+static void     secure_channel_finalize     (GObject           *object);
+static void     secure_channel_get_property (GObject           *object,
+                                             guint              param_id,
+                                             GValue            *value,
+                                             GParamSpec        *pspec);
+static void     secure_channel_set_property (GObject           *object,
+                                             guint              param_id,
+                                             const GValue      *value,
+                                             GParamSpec        *pspec);
+static GIOStatus secure_channel_read        (LmChannel         *channel,
+                                             gchar             *buf,
+                                             gsize              len,
+                                             gsize             *read_len,
+                                             GError           **error);
+static GIOStatus secure_channel_write       (LmChannel         *channel,
+                                             const gchar       *buf,
+                                             gssize             len,
+                                             gsize             *written_len,
+                                             GError           **error);
+static void      secure_channel_close       (LmChannel         *channel);
 
-G_DEFINE_TYPE (LmSecureChannel, lm_secure_channel, G_TYPE_OBJECT)
+G_DEFINE_TYPE_WITH_CODE (LmSecureChannel, lm_secure_channel, G_TYPE_OBJECT,
+                         G_IMPLEMENT_INTERFACE (LM_TYPE_CHANNEL,
+                                                secure_channel_iface_init))
 
 enum {
     PROP_0,
+    PROP_FINGERPRINT,
+    PROP_EXPECTED_FINGERPRINT,
+    PROP_IS_SECURE,
     PROP_MY_PROP
 };
 
 enum {
-    SIGNAL_NAME,
+    HANDSHAKE_RESULT,
+    RESPONSE_REQUIRED, /* Come up with a better name */
     LAST_SIGNAL
 };
 
@@ -71,8 +95,8 @@ lm_secure_channel_class_init (LmSecureChannelClass *class)
                                                           NULL,
                                                           G_PARAM_READWRITE));
     
-    signals[SIGNAL_NAME] = 
-        g_signal_new ("signal-name",
+    signals[HANDSHAKE_RESULT] = 
+        g_signal_new ("handshake-result",
                       G_OBJECT_CLASS_TYPE (object_class),
                       G_SIGNAL_RUN_LAST,
                       0,
@@ -94,6 +118,14 @@ lm_secure_channel_init (LmSecureChannel *secure_channel)
 }
 
 static void
+secure_channel_iface_init (LmChannelIface *iface)
+{
+    iface->read  = secure_channel_read;
+    iface->write = secure_channel_write;
+    iface->close = secure_channel_close;
+}
+
+static void
 secure_channel_finalize (GObject *object)
 {
     LmSecureChannelPriv *priv;
@@ -105,9 +137,9 @@ secure_channel_finalize (GObject *object)
 
 static void
 secure_channel_get_property (GObject    *object,
-                    guint       param_id,
-                    GValue     *value,
-                    GParamSpec *pspec)
+                             guint       param_id,
+                             GValue     *value,
+                             GParamSpec *pspec)
 {
     LmSecureChannelPriv *priv;
 
@@ -125,9 +157,9 @@ secure_channel_get_property (GObject    *object,
 
 static void
 secure_channel_set_property (GObject      *object,
-                    guint         param_id,
-                    const GValue *value,
-                    GParamSpec   *pspec)
+                             guint         param_id,
+                             const GValue *value,
+                             GParamSpec   *pspec)
 {
     LmSecureChannelPriv *priv;
 
@@ -141,5 +173,71 @@ secure_channel_set_property (GObject      *object,
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
         break;
     };
+}
+
+static GIOStatus
+secure_channel_read (LmChannel  *channel,
+                     gchar      *buf,
+                     gsize       len,
+                     gsize      *read_len,
+                     GError    **error)
+{
+    LmSecureChannelPriv *priv;
+
+    g_return_val_if_fail (LM_IS_SECURE_CHANNEL (channel), 
+                          G_IO_STATUS_ERROR);
+    
+    priv = GET_PRIV (channel);
+   
+    if (!priv->encrypted) {
+        return lm_channel_read (lm_channel_get_inner (channel),
+                                buf, len, read_len, error);
+    } 
+
+    return LM_SECURE_CHANNEL_GET_CLASS(channel)->secure_read (channel,
+                                                              buf, len, 
+                                                              read_len, error);
+}
+
+static GIOStatus
+secure_channel_write (LmChannel    *channel,
+                      const gchar  *buf,
+                      gssize        len,
+                      gsize        *written_len,
+                      GError      **error)
+{
+    LmSecureChannelPriv *priv;
+
+    g_return_val_if_fail (LM_IS_SECURE_CHANNEL (channel), 
+                          G_IO_STATUS_ERROR);
+    
+    priv = GET_PRIV (channel);
+   
+    if (!priv->encrypted) {
+        return lm_channel_write (lm_channel_get_inner (channel),
+                                 buf, len, written_len, error);
+    } 
+
+    return LM_SECURE_CHANNEL_GET_CLASS(channel)->secure_write (channel,
+                                                               buf, len,
+                                                               written_len,
+                                                               error);
+}
+
+static void
+secure_channel_close (LmChannel *channel)
+{
+    LmSecureChannelPriv *priv;
+
+    g_return_if_fail (LM_IS_SECURE_CHANNEL (channel));
+    
+    priv = GET_PRIV (channel);
+   
+    if (!priv->encrypted) {
+        return lm_channel_close (lm_channel_get_inner (channel));
+    } 
+
+    LM_SECURE_CHANNEL_GET_CLASS(channel)->secure_close (channel);
+    /* FIXME: Read here too? */
 }
 

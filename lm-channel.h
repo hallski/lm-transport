@@ -46,18 +46,20 @@ struct _LmChannelIface {
     GTypeInterface parent;
 
     /* <vtable> */
-    GIOStatus  (*read)       (LmChannel    *channel,
-                              gchar        *buf,
-                              gsize         count,
-                              gsize        *bytes_read,
-                              GError      **error);
-    GIOStatus  (*write)      (LmChannel    *channel,
-                              const gchar  *buf,
-                              gssize        count,
-                              gsize        *bytes_written,
-                              GError      **error);
+    GIOStatus   (*read)       (LmChannel    *channel,
+                               gchar        *buf,
+                               gsize         count,
+                               gsize        *bytes_read,
+                               GError      **error);
+    GIOStatus   (*write)      (LmChannel    *channel,
+                               const gchar  *buf,
+                               gssize        count,
+                               gsize        *bytes_written,
+                               GError      **error);
 
-    void       (*close)      (LmChannel    *channel);
+    void        (*close)      (LmChannel    *channel);
+
+    LmChannel * (*get_inner)  (LmChannel   *channel);
 };
 
 typedef enum {
@@ -80,6 +82,8 @@ GIOStatus      lm_channel_write             (LmChannel *channel,
                                              GError      **error);
 
 void           lm_channel_close             (LmChannel *channel);
+
+LmChannel *    lm_channel_get_inner         (LmChannel *channel);
 
 G_END_DECLS
 

@@ -23,6 +23,7 @@
 
 #include <glib-object.h>
 
+#include "lm-channel.h"
 #include "lm-socket-address.h"
 
 G_BEGIN_DECLS
@@ -51,11 +52,11 @@ typedef enum {
     LM_SOCKET_CONNECT_FAILED_TRIED_ALL,
 } LmSocketConnectResult;
 
-GType      lm_socket_get_type  (void);
+GType       lm_socket_get_type       (void);
 
-LmSocket * lm_socket_new            (GMainContext    *context,
-                                     LmSocketAddress *address);
-void       lm_socket_connect        (LmSocket        *socket);
+LmChannel * lm_socket_new            (GMainContext    *context,
+                                      LmSocketAddress *address);
+void        lm_socket_connect        (LmSocket        *socket);
 
 G_END_DECLS
 

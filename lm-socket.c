@@ -546,10 +546,10 @@ socket_hup_cb (GIOChannel   *source,
 }
 
 /* -- Public API -- */
-LmSocket * 
+LmChannel * 
 lm_socket_new (GMainContext *context, LmSocketAddress *address)
 {
-    LmSocket *socket;
+    LmChannel *socket;
 
     socket = g_object_new (LM_TYPE_SOCKET, 
                            "context", context,

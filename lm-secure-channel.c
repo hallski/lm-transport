@@ -28,6 +28,7 @@
 
 typedef struct LmSecureChannelPriv LmSecureChannelPriv;
 struct LmSecureChannelPriv {
+    LmChannel *inner_channel;
     gchar    *expected_fingerprint;
     gchar    *fingerprint;
 
@@ -36,27 +37,36 @@ struct LmSecureChannelPriv {
     gint my_prop;
 };
 
-static void     secure_channel_iface_init   (LmChannelIface    *iface);
-static void     secure_channel_finalize     (GObject           *object);
-static void     secure_channel_get_property (GObject           *object,
-                                             guint              param_id,
-                                             GValue            *value,
-                                             GParamSpec        *pspec);
-static void     secure_channel_set_property (GObject           *object,
-                                             guint              param_id,
-                                             const GValue      *value,
-                                             GParamSpec        *pspec);
-static GIOStatus secure_channel_read        (LmChannel         *channel,
-                                             gchar             *buf,
-                                             gsize              len,
-                                             gsize             *read_len,
-                                             GError           **error);
-static GIOStatus secure_channel_write       (LmChannel         *channel,
-                                             const gchar       *buf,
-                                             gssize             len,
-                                             gsize             *written_len,
-                                             GError           **error);
-static void      secure_channel_close       (LmChannel         *channel);
+static void       secure_channel_iface_init   (LmChannelIface    *iface);
+static void       secure_channel_finalize     (GObject           *object);
+static void       secure_channel_get_property (GObject           *object,
+                                               guint              param_id,
+                                               GValue            *value,
+                                               GParamSpec        *pspec);
+static void       secure_channel_set_property (GObject           *object,
+                                               guint              param_id,
+                                               const GValue      *value,
+                                               GParamSpec        *pspec);
+static GIOStatus   secure_channel_read        (LmChannel         *channel,
+                                               gchar             *buf,
+                                               gsize              len,
+                                               gsize             *read_len,
+                                               GError           **error);
+static GIOStatus   secure_channel_write       (LmChannel         *channel,
+                                               const gchar       *buf,
+                                               gssize             len,
+                                               gsize             *written_len,
+                                               GError           **error);
+static void        secure_channel_close       (LmChannel         *channel);
+static LmChannel * secure_channel_get_inner   (LmChannel         *channel);
+static void        secure_channel_inner_readable_cb     (LmChannel   *inner,
+                                                         LmChannel   *channel);
+static void        secure_channel_inner_writeable_cb    (LmChannel   *inner,
+                                                         LmChannel   *channel);
+static void 
+secure_channel_inner_disconnected_cb      (LmChannel                 *inner,
+                                           LmChannelDisconnectReason  reason,
+                                           LmChannel                 *channel);
 
 G_DEFINE_TYPE_WITH_CODE (LmSecureChannel, lm_secure_channel, G_TYPE_OBJECT,
                          G_IMPLEMENT_INTERFACE (LM_TYPE_CHANNEL,
@@ -120,9 +130,10 @@ lm_secure_channel_init (LmSecureChannel *secure_channel)
 static void
 secure_channel_iface_init (LmChannelIface *iface)
 {
-    iface->read  = secure_channel_read;
-    iface->write = secure_channel_write;
-    iface->close = secure_channel_close;
+    iface->read      = secure_channel_read;
+    iface->write     = secure_channel_write;
+    iface->close     = secure_channel_close;
+    iface->get_inner = secure_channel_get_inner;
 }
 
 static void
@@ -188,9 +199,11 @@ secure_channel_read (LmChannel  *channel,
                           G_IO_STATUS_ERROR);
     
     priv = GET_PRIV (channel);
+
+    g_print ("Secure read\n");
    
     if (!priv->encrypted) {
-        return lm_channel_read (lm_channel_get_inner (channel),
+        return lm_channel_read (priv->inner_channel,
                                 buf, len, read_len, error);
     } 
 
@@ -214,7 +227,7 @@ secure_channel_write (LmChannel    *channel,
     priv = GET_PRIV (channel);
    
     if (!priv->encrypted) {
-        return lm_channel_write (lm_channel_get_inner (channel),
+        return lm_channel_write (priv->inner_channel,
                                  buf, len, written_len, error);
     } 
 
@@ -234,10 +247,67 @@ secure_channel_close (LmChannel *channel)
     priv = GET_PRIV (channel);
    
     if (!priv->encrypted) {
-        return lm_channel_close (lm_channel_get_inner (channel));
+        return lm_channel_close (priv->inner_channel);
     } 
 
     LM_SECURE_CHANNEL_GET_CLASS(channel)->secure_close (channel);
     /* FIXME: Read here too? */
 }
 
+static LmChannel *
+secure_channel_get_inner (LmChannel *channel)
+{
+    LmSecureChannelPriv *priv;
+
+    g_return_val_if_fail (LM_IS_SECURE_CHANNEL (channel), NULL);
+
+    priv = GET_PRIV (channel);
+
+    return priv->inner_channel;
+}
+
+static void
+secure_channel_inner_readable_cb (LmChannel *inner, LmChannel *channel)
+{
+    g_signal_emit_by_name (channel, "readable");
+}
+
+static void
+secure_channel_inner_writeable_cb (LmChannel *inner, LmChannel *channel)
+{
+    g_signal_emit_by_name (channel, "writeable");
+}
+
+static void
+secure_channel_inner_disconnected_cb (LmChannel                 *inner, 
+                                      LmChannelDisconnectReason  reason,
+                                      LmChannel                 *channel)
+{
+    g_signal_emit_by_name (channel, "disconnected", reason);
+}
+
+LmChannel *
+lm_secure_channel_new (GMainContext *context, LmChannel *inner_channel)
+{
+    LmChannel           *channel;
+    LmSecureChannelPriv *priv;
+
+    channel = g_object_new (LM_TYPE_SECURE_CHANNEL, NULL);
+    priv    = GET_PRIV (channel);
+
+    priv->inner_channel = g_object_ref (inner_channel);
+
+    g_signal_connect (priv->inner_channel, "readable",
+                      G_CALLBACK (secure_channel_inner_readable_cb),
+                      channel);
+
+    g_signal_connect (priv->inner_channel, "writeable",
+                      G_CALLBACK (secure_channel_inner_writeable_cb),
+                      channel);
+
+    g_signal_connect (priv->inner_channel, "disconnected",
+                      G_CALLBACK (secure_channel_inner_disconnected_cb),
+                      channel);
+
+    return channel;
+}

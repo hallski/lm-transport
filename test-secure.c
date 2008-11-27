@@ -8,6 +8,7 @@
 
 #include "lm-channel.h"
 #include "lm-resolver.h"
+#include "lm-secure-channel.h"
 #include "lm-socket.h"
 
 static gchar     *host;
@@ -85,6 +86,7 @@ main (int argc, char **argv)
 {
         LmSocketAddress *sa;
         LmChannel       *socket;
+        LmChannel       *secure;
 
         g_type_init ();
 
@@ -104,14 +106,16 @@ main (int argc, char **argv)
         g_signal_connect (socket, "connect-result", 
                           G_CALLBACK (socket_connected),
                           NULL);
-        g_signal_connect (socket, "readable",
+        lm_socket_connect (LM_SOCKET (socket));
+
+        secure = lm_secure_channel_new (NULL, socket);
+
+        g_signal_connect (secure, "readable",
                           G_CALLBACK (socket_readable),
                           NULL);
-        g_signal_connect (socket, "disconnected",
+        g_signal_connect (secure, "disconnected",
                           G_CALLBACK (socket_disconnected),
                           NULL);
-
-        lm_socket_connect (LM_SOCKET (socket));
 
         loop = g_main_loop_new (NULL, FALSE);
 

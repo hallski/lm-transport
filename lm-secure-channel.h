@@ -64,6 +64,9 @@ struct LmSecureChannelClass {
 
 GType   lm_secure_channel_get_type        (void);
 
+LmChannel    * lm_secure_channel_new      (GMainContext *context,
+                                           LmChannel    *inner_channel);
+
 /* 
  * Need a way to communicate certificate and ssl-callback
  *

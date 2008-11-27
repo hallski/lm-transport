@@ -8,3 +8,5 @@ CMakeCache.txt
 lm-marshal.[ch]
 test
 test-connect
+test-secure
+

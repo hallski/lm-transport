@@ -60,18 +60,18 @@ socket_connected (LmSocket *socket, int res, gpointer user_data)
 }
 
 static void
-socket_disconnected (LmSocket *socket, LmChannelDisconnectReason reason)
+socket_disconnected (LmSocket *socket, LmChannelCloseReason reason)
 {
         g_print ("Disconnected due to: ");
 
         switch (reason) {
-        case LM_CHANNEL_DISCONNECT_REQUESTED:
+        case LM_CHANNEL_CLOSE_REQUESTED:
                 g_print ("User requested\n");
                 break;
-        case LM_CHANNEL_DISCONNECT_IO_ERROR:
+        case LM_CHANNEL_CLOSE_IO_ERROR:
                 g_print ("I/O Error\n");
                 break;
-        case LM_CHANNEL_DISCONNECT_HUP:
+        case LM_CHANNEL_CLOSE_HUP:
                 g_print ("HUP\n");
                 break;
         };

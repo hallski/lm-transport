@@ -63,10 +63,10 @@ struct _LmChannelIface {
 };
 
 typedef enum {
-    LM_CHANNEL_DISCONNECT_REQUESTED,
-    LM_CHANNEL_DISCONNECT_HUP,
-    LM_CHANNEL_DISCONNECT_IO_ERROR,
-} LmChannelDisconnectReason;
+    LM_CHANNEL_CLOSE_REQUESTED,
+    LM_CHANNEL_CLOSE_HUP,
+    LM_CHANNEL_CLOSE_IO_ERROR,
+} LmChannelCloseReason;
 
 GType          lm_channel_get_type          (void);
 

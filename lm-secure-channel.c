@@ -64,9 +64,9 @@ static void        secure_channel_inner_readable_cb     (LmChannel   *inner,
 static void        secure_channel_inner_writeable_cb    (LmChannel   *inner,
                                                          LmChannel   *channel);
 static void 
-secure_channel_inner_disconnected_cb      (LmChannel                 *inner,
-                                           LmChannelDisconnectReason  reason,
-                                           LmChannel                 *channel);
+secure_channel_inner_disconnected_cb      (LmChannel            *inner,
+                                           LmChannelCloseReason  reason,
+                                           LmChannel            *channel);
 
 G_DEFINE_TYPE_WITH_CODE (LmSecureChannel, lm_secure_channel, G_TYPE_OBJECT,
                          G_IMPLEMENT_INTERFACE (LM_TYPE_CHANNEL,
@@ -279,9 +279,9 @@ secure_channel_inner_writeable_cb (LmChannel *inner, LmChannel *channel)
 }
 
 static void
-secure_channel_inner_disconnected_cb (LmChannel                 *inner, 
-                                      LmChannelDisconnectReason  reason,
-                                      LmChannel                 *channel)
+secure_channel_inner_disconnected_cb (LmChannel            *inner, 
+                                      LmChannelCloseReason  reason,
+                                      LmChannel            *channel)
 {
     g_signal_emit_by_name (channel, "disconnected", reason);
 }

@@ -105,8 +105,8 @@ static gboolean  socket_hup_cb              (GIOChannel        *source,
                                              LmSocket          *socket);
 static void      socket_reset               (LmSocket          *socket);
 static void      
-socket_emit_disconnected_and_cleanup        (LmSocket                  *socket,
-                                             LmChannelDisconnectReason  reason);
+socket_emit_disconnected_and_cleanup        (LmSocket             *socket,
+                                             LmChannelCloseReason  reason);
 
 G_DEFINE_TYPE_WITH_CODE (LmSocket, lm_socket, G_TYPE_OBJECT,
                          G_IMPLEMENT_INTERFACE (LM_TYPE_CHANNEL,
@@ -296,7 +296,7 @@ socket_close (LmChannel *channel)
     priv = GET_PRIV (channel);
 
     socket_emit_disconnected_and_cleanup (LM_SOCKET (channel), 
-                                          LM_CHANNEL_DISCONNECT_REQUESTED);
+                                          LM_CHANNEL_CLOSE_REQUESTED);
 }
 
 static LmChannel *
@@ -352,10 +352,10 @@ socket_reset (LmSocket *socket)
 }
 
 static void
-socket_emit_disconnected_and_cleanup (LmSocket                  *socket,
-                                      LmChannelDisconnectReason  reason)
+socket_emit_disconnected_and_cleanup (LmSocket             *socket,
+                                      LmChannelCloseReason  reason)
 {
-    g_signal_emit_by_name (socket, "disconnected", reason);
+    g_signal_emit_by_name (socket, "closed", reason);
     
     socket_reset (socket);
 }
@@ -528,7 +528,7 @@ socket_err_cb (GIOChannel   *source,
         }
     } else {
         socket_emit_disconnected_and_cleanup (socket, 
-                                              LM_CHANNEL_DISCONNECT_IO_ERROR);
+                                              LM_CHANNEL_CLOSE_IO_ERROR);
         return FALSE;
     }
 
@@ -540,7 +540,7 @@ socket_hup_cb (GIOChannel   *source,
                GIOCondition  condition,
                LmSocket     *socket)
 {
-    socket_emit_disconnected_and_cleanup (socket, LM_CHANNEL_DISCONNECT_HUP);
+    socket_emit_disconnected_and_cleanup (socket, LM_CHANNEL_CLOSE_HUP);
     
     return FALSE;
 }

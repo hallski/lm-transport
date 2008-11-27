@@ -26,9 +26,10 @@
 static void    channel_base_init (LmChannelIface *iface);
 
 enum {
+    OPENED,
     READABLE,
     WRITEABLE,
-    DISCONNECTED,
+    CLOSED,
     ERROR,
     LAST_SIGNAL
 };
@@ -64,6 +65,15 @@ channel_base_init (LmChannelIface *iface)
     static gboolean initialized = FALSE;
 
     if (!initialized) {
+        signals[OPENED] =
+            g_signal_new ("opened",
+                          LM_TYPE_CHANNEL,
+                          G_SIGNAL_RUN_LAST,
+                          0,
+                          NULL, NULL,
+                          _lm_marshal_VOID__VOID,
+                          G_TYPE_NONE,
+                          0);
         signals[READABLE] =
             g_signal_new ("readable",
                           LM_TYPE_CHANNEL,
@@ -84,8 +94,8 @@ channel_base_init (LmChannelIface *iface)
                           G_TYPE_NONE,
                           0);
 
-        signals[DISCONNECTED] =
-            g_signal_new ("disconnected",
+        signals[CLOSED] =
+            g_signal_new ("closed",
                           LM_TYPE_CHANNEL,
                           G_SIGNAL_RUN_LAST,
                           0,

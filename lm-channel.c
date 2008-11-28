@@ -83,14 +83,14 @@ lm_channel_class_init (LmChannelClass *class)
                                  "Inner channel",
                                  "Channel encapsulated by this channel",
                                  LM_TYPE_CHANNEL,
-                                 G_PARAM_READWRITE);
+                                 G_PARAM_READABLE);
     g_object_class_install_property (object_class, PROP_INNER_CHANNEL, pspec);
 
     pspec = g_param_spec_object ("outer-channel",
                                  "Outer channel",
                                  "Channel encapsulating by this channel",
                                  LM_TYPE_CHANNEL,
-                                 G_PARAM_READWRITE);
+                                 G_PARAM_READABLE);
     g_object_class_install_property (object_class, PROP_OUTER_CHANNEL, pspec);
 
  
@@ -179,6 +179,12 @@ channel_get_property (GObject    *object,
         case PROP_CONTEXT:
             g_value_set_pointer (value, priv->context);
             break;
+        case PROP_INNER_CHANNEL:
+            g_value_set_object (value, priv->inner);
+            break;
+        case PROP_OUTER_CHANNEL:
+            g_value_set_object (value, priv->outer);
+            break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
             break;
@@ -266,4 +272,90 @@ lm_channel_get_inner (LmChannel *channel)
 
     return LM_CHANNEL_GET_CLASS(channel)->get_inner (channel);
 }
+
+static void
+channel_inner_opened_cb (LmChannel *inner, LmChannel *channel)
+{
+    g_signal_emit_by_name (channel, "opened");
+}
+
+static void
+channel_inner_readable_cb (LmChannel *inner, LmChannel *channel)
+{
+    g_signal_emit_by_name (channel, "readable");
+}
+
+static void
+channel_inner_writeable_cb (LmChannel *inner, LmChannel *channel)
+{
+    g_signal_emit_by_name (channel, "writeable");
+}
+
+static void
+channel_inner_closed_cb (LmChannel            *inner, 
+                         LmChannelCloseReason  reason,
+                         LmChannel            *channel)
+{
+    g_signal_emit_by_name (channel, "closed", reason);
+}
+
+void
+lm_channel_set_inner (LmChannel *channel, LmChannel *inner)
+{
+    LmChannelPriv *priv;
+
+    g_return_if_fail (LM_IS_CHANNEL (channel));
+    g_return_if_fail (LM_IS_CHANNEL (inner));
+
+    priv = GET_PRIV (channel);
+
+    if (priv->inner) {
+        /* disconnect */
+    } 
+
+    priv->inner = g_object_ref (inner);
+
+    g_signal_connect (priv->inner, "opened",
+                      G_CALLBACK (channel_inner_opened_cb),
+                      channel);
+
+    g_signal_connect (priv->inner, "readable",
+                      G_CALLBACK (channel_inner_readable_cb),
+                      channel);
+
+    g_signal_connect (priv->inner, "writeable",
+                      G_CALLBACK (channel_inner_writeable_cb),
+                      channel);
+    
+    g_signal_connect (priv->inner, "closed",
+                      G_CALLBACK (channel_inner_closed_cb),
+                      channel);
+}
+
+LmChannel *
+lm_channel_get_outer (LmChannel *channel)
+{
+    LmChannelPriv *priv;
+
+    g_return_val_if_fail (LM_IS_CHANNEL (channel), NULL);
+
+    priv = GET_PRIV (channel);
+
+    return priv->outer;
+}
+
+void 
+lm_channel_set_outer (LmChannel *channel, LmChannel *outer)
+{
+    LmChannelPriv *priv;
+
+    g_return_if_fail (LM_IS_CHANNEL (channel));
+    g_return_if_fail (LM_IS_CHANNEL (outer));
+
+    priv = GET_PRIV (channel);
+
+    /* TODO: What to do here? */
+}
+
+
 

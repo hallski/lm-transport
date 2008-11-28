@@ -98,6 +98,12 @@ GIOStatus      lm_channel_write             (LmChannel *channel,
 void           lm_channel_close             (LmChannel *channel);
 
 LmChannel *    lm_channel_get_inner         (LmChannel *channel);
+void           lm_channel_set_inner         (LmChannel *channel,
+                                             LmChannel *inner);
+
+LmChannel *    lm_channel_get_outer         (LmChannel *channel);
+void           lm_channel_set_outer         (LmChannel *channel,
+                                             LmChannel *outer);
 
 G_END_DECLS
 

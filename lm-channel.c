@@ -23,7 +23,31 @@
 #include "lm-marshal.h"
 #include "lm-channel.h"
 
-static void    channel_base_init (LmChannelIface *iface);
+#define GET_PRIV(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), LM_TYPE_CHANNEL, LmChannelPriv))
+
+typedef struct LmChannelPriv LmChannelPriv;
+struct LmChannelPriv {
+    GMainContext *context;
+    gint my_prop;
+};
+
+static void     channel_finalize            (GObject           *object);
+static void     channel_get_property        (GObject           *object,
+                                             guint              param_id,
+                                             GValue            *value,
+                                             GParamSpec        *pspec);
+static void     channel_set_property        (GObject           *object,
+                                             guint              param_id,
+                                             const GValue      *value,
+                                             GParamSpec        *pspec);
+
+G_DEFINE_ABSTRACT_TYPE (LmChannel, lm_channel, G_TYPE_OBJECT)
+
+enum {
+    PROP_0,
+    PROP_CONTEXT,
+    PROP_MY_PROP
+};
 
 enum {
     OPENED,
@@ -36,86 +60,137 @@ enum {
 
 static guint signals[LAST_SIGNAL] = { 0 };
 
-GType
-lm_channel_get_type (void)
+static void
+lm_channel_class_init (LmChannelClass *class)
 {
-    static GType iface_type = 0;
+    GObjectClass *object_class = G_OBJECT_CLASS (class);
+    GParamSpec   *pspec;
 
-    if (!iface_type) {
-        static const GTypeInfo iface_info = {
-            sizeof (LmChannelIface),
-            (GBaseInitFunc)     channel_base_init,
-            (GBaseFinalizeFunc) NULL,
-        };
+    object_class->finalize     = channel_finalize;
+    object_class->get_property = channel_get_property;
+    object_class->set_property = channel_set_property;
 
-        iface_type = g_type_register_static (G_TYPE_INTERFACE,
-                                             "LmChannelIface",
-                                             &iface_info,
-                                             0);
+    pspec = g_param_spec_pointer ("context",
+                                  "Main context",
+                                  "GMainContext to run this socket",
+                                  G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    
+    g_object_class_install_property (object_class, PROP_CONTEXT, pspec);
 
-        g_type_interface_add_prerequisite (iface_type, G_TYPE_OBJECT);
-    }
+ 
+    signals[OPENED] =
+        g_signal_new ("opened",
+                      LM_TYPE_CHANNEL,
+                      G_SIGNAL_RUN_LAST,
+                      0,
+                      NULL, NULL,
+                      _lm_marshal_VOID__VOID,
+                      G_TYPE_NONE,
+                      0);
+    signals[READABLE] =
+        g_signal_new ("readable",
+                      LM_TYPE_CHANNEL,
+                      G_SIGNAL_RUN_LAST,
+                      0,
+                      NULL, NULL,
+                      _lm_marshal_VOID__VOID,
+                      G_TYPE_NONE,
+                      0);
 
-    return iface_type;
+    signals[WRITEABLE] =
+        g_signal_new ("writeable",
+                      LM_TYPE_CHANNEL,
+                      G_SIGNAL_RUN_LAST,
+                      0,
+                      NULL, NULL,
+                      _lm_marshal_VOID__VOID,
+                      G_TYPE_NONE,
+                      0);
+
+    signals[CLOSED] =
+        g_signal_new ("closed",
+                      LM_TYPE_CHANNEL,
+                      G_SIGNAL_RUN_LAST,
+                      0,
+                      NULL, NULL,
+                      _lm_marshal_VOID__INT,
+                      G_TYPE_NONE,
+                      1, G_TYPE_INT);
+
+    signals[ERROR] =
+        g_signal_new ("error",
+                      LM_TYPE_CHANNEL,
+                      G_SIGNAL_RUN_LAST,
+                      0,
+                      NULL, NULL,
+                      _lm_marshal_VOID__VOID,
+                      G_TYPE_NONE,
+                      0);
+
+    g_type_class_add_private (object_class, sizeof (LmChannelPriv));
 }
 
 static void
-channel_base_init (LmChannelIface *iface)
+lm_channel_init (LmChannel *channel)
 {
-    static gboolean initialized = FALSE;
+    LmChannelPriv *priv;
 
-    if (!initialized) {
-        signals[OPENED] =
-            g_signal_new ("opened",
-                          LM_TYPE_CHANNEL,
-                          G_SIGNAL_RUN_LAST,
-                          0,
-                          NULL, NULL,
-                          _lm_marshal_VOID__VOID,
-                          G_TYPE_NONE,
-                          0);
-        signals[READABLE] =
-            g_signal_new ("readable",
-                          LM_TYPE_CHANNEL,
-                          G_SIGNAL_RUN_LAST,
-                          0,
-                          NULL, NULL,
-                          _lm_marshal_VOID__VOID,
-                          G_TYPE_NONE,
-                          0);
+    priv = GET_PRIV (channel);
 
-        signals[WRITEABLE] =
-            g_signal_new ("writeable",
-                          LM_TYPE_CHANNEL,
-                          G_SIGNAL_RUN_LAST,
-                          0,
-                          NULL, NULL,
-                          _lm_marshal_VOID__VOID,
-                          G_TYPE_NONE,
-                          0);
+}
 
-        signals[CLOSED] =
-            g_signal_new ("closed",
-                          LM_TYPE_CHANNEL,
-                          G_SIGNAL_RUN_LAST,
-                          0,
-                          NULL, NULL,
-                          _lm_marshal_VOID__INT,
-                          G_TYPE_NONE,
-                          1, G_TYPE_INT);
+static void
+channel_finalize (GObject *object)
+{
+    LmChannelPriv *priv;
 
-        signals[ERROR] =
-            g_signal_new ("error",
-                          LM_TYPE_CHANNEL,
-                          G_SIGNAL_RUN_LAST,
-                          0,
-                          NULL, NULL,
-                          _lm_marshal_VOID__VOID,
-                          G_TYPE_NONE,
-                          0);
+    priv = GET_PRIV (object);
 
-        initialized = TRUE;
-    }
+    (G_OBJECT_CLASS (lm_channel_parent_class)->finalize) (object);
+}
+
+static void
+channel_get_property (GObject    *object,
+                    guint       param_id,
+                    GValue     *value,
+                    GParamSpec *pspec)
+{
+    LmChannelPriv *priv;
+
+    priv = GET_PRIV (object);
+
+    switch (param_id) {
+        case PROP_CONTEXT:
+            g_value_set_pointer (value, priv->context);
+            break;
+        default:
+            G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
+            break;
+    };
+}
+
+static void
+channel_set_property (GObject      *object,
+                      guint         param_id,
+                      const GValue *value,
+                      GParamSpec   *pspec)
+{
+    LmChannelPriv *priv;
+    GMainContext *context;
+
+    priv = GET_PRIV (object);
+
+    switch (param_id) {
+        case PROP_CONTEXT:
+            context = g_value_get_pointer (value);
+            if (context) {
+                priv->context = g_main_context_ref (context);
+            }
+            break;
+        default:
+            G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
+            break;
+    };
 }
 
 GIOStatus 
@@ -127,11 +202,11 @@ lm_channel_read (LmChannel *channel,
 {
     g_return_val_if_fail (LM_IS_CHANNEL (channel), G_IO_STATUS_ERROR);
 
-    if (!LM_CHANNEL_GET_IFACE(channel)->read) {
+    if (!LM_CHANNEL_GET_CLASS(channel)->read) {
         g_assert_not_reached ();
     }
 
-    return LM_CHANNEL_GET_IFACE(channel)->read (channel, buf, count,
+    return LM_CHANNEL_GET_CLASS(channel)->read (channel, buf, count,
                                                 bytes_read, error);
 }
 
@@ -144,11 +219,11 @@ lm_channel_write (LmChannel *channel,
 {
     g_return_val_if_fail (LM_IS_CHANNEL (channel), G_IO_STATUS_ERROR);
 
-    if (!LM_CHANNEL_GET_IFACE(channel)->write) {
+    if (!LM_CHANNEL_GET_CLASS(channel)->write) {
         g_assert_not_reached ();
     }
 
-    return LM_CHANNEL_GET_IFACE(channel)->write (channel, buf, count,
+    return LM_CHANNEL_GET_CLASS(channel)->write (channel, buf, count,
                                                  bytes_written, error);
 }
 
@@ -157,11 +232,11 @@ lm_channel_close (LmChannel *channel)
 {
     g_return_if_fail (LM_IS_CHANNEL (channel));
 
-    if (!LM_CHANNEL_GET_IFACE(channel)->close) {
+    if (!LM_CHANNEL_GET_CLASS(channel)->close) {
         g_assert_not_reached ();
     }
 
-    return LM_CHANNEL_GET_IFACE(channel)->close (channel);
+    return LM_CHANNEL_GET_CLASS(channel)->close (channel);
 }
 
 LmChannel *
@@ -169,11 +244,12 @@ lm_channel_get_inner (LmChannel *channel)
 {
     g_return_val_if_fail (LM_IS_CHANNEL (channel), NULL);
 
-    if (!LM_CHANNEL_GET_IFACE(channel)->get_inner) {
+    if (!LM_CHANNEL_GET_CLASS(channel)->get_inner) {
         g_assert_not_reached ();
     }
 
-    return LM_CHANNEL_GET_IFACE(channel)->get_inner (channel);
+    return LM_CHANNEL_GET_CLASS(channel)->get_inner (channel);
 }
+
 
 

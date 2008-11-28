@@ -39,11 +39,11 @@ typedef struct LmSocket      LmSocket;
 typedef struct LmSocketClass LmSocketClass;
 
 struct LmSocket {
-    GObject parent;
+    LmChannel parent;
 };
 
 struct LmSocketClass {
-    GObjectClass parent_class;
+    LmChannelClass parent_class;
 };
 
 typedef enum {

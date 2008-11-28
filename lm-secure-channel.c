@@ -37,7 +37,6 @@ struct LmSecureChannelPriv {
     gint my_prop;
 };
 
-static void       secure_channel_iface_init   (LmChannelIface    *iface);
 static void       secure_channel_finalize     (GObject           *object);
 static void       secure_channel_get_property (GObject           *object,
                                                guint              param_id,
@@ -60,9 +59,7 @@ static GIOStatus   secure_channel_write       (LmChannel         *channel,
 static void        secure_channel_close       (LmChannel         *channel);
 static LmChannel * secure_channel_get_inner   (LmChannel         *channel);
 
-G_DEFINE_TYPE_WITH_CODE (LmSecureChannel, lm_secure_channel, G_TYPE_OBJECT,
-                         G_IMPLEMENT_INTERFACE (LM_TYPE_CHANNEL,
-                                                secure_channel_iface_init))
+G_DEFINE_TYPE (LmSecureChannel, lm_secure_channel, LM_TYPE_CHANNEL)
 
 enum {
     PROP_0,
@@ -83,11 +80,17 @@ static guint signals[LAST_SIGNAL] = { 0 };
 static void
 lm_secure_channel_class_init (LmSecureChannelClass *class)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS (class);
+    GObjectClass   *object_class = G_OBJECT_CLASS (class);
+    LmChannelClass *channel_class = LM_CHANNEL_CLASS (class);
 
     object_class->finalize     = secure_channel_finalize;
     object_class->get_property = secure_channel_get_property;
     object_class->set_property = secure_channel_set_property;
+
+    channel_class->read        = secure_channel_read;
+    channel_class->write       = secure_channel_write;
+    channel_class->close       = secure_channel_close;
+    channel_class->get_inner   = secure_channel_get_inner;
 
     g_object_class_install_property (object_class,
                                      PROP_MY_PROP,
@@ -117,15 +120,6 @@ lm_secure_channel_init (LmSecureChannel *secure_channel)
 
     priv = GET_PRIV (secure_channel);
 
-}
-
-static void
-secure_channel_iface_init (LmChannelIface *iface)
-{
-    iface->read      = secure_channel_read;
-    iface->write     = secure_channel_write;
-    iface->close     = secure_channel_close;
-    iface->get_inner = secure_channel_get_inner;
 }
 
 static void
@@ -295,6 +289,9 @@ lm_secure_channel_new (GMainContext *context, LmChannel *inner_channel)
 
     priv->inner_channel = g_object_ref (inner_channel);
 
+    /* Move this to a LmChannel parent class (make it a class instead of an 
+     * interface).
+     */
     g_signal_connect (priv->inner_channel, "opened",
                       G_CALLBACK (secure_channel_inner_opened_cb),
                       channel);

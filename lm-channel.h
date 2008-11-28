@@ -34,17 +34,23 @@
 
 G_BEGIN_DECLS
 
-#define LM_TYPE_CHANNEL             (lm_channel_get_type())
-#define LM_CHANNEL(o)               (G_TYPE_CHECK_INSTANCE_CAST((o), LM_TYPE_CHANNEL, LmChannel))
-#define LM_IS_CHANNEL(o)            (G_TYPE_CHECK_INSTANCE_TYPE((o), LM_TYPE_CHANNEL))
-#define LM_CHANNEL_GET_IFACE(o)     (G_TYPE_INSTANCE_GET_INTERFACE((o), LM_TYPE_CHANNEL, LmChannelIface))
+#define LM_TYPE_CHANNEL            (lm_channel_get_type ())
+#define LM_CHANNEL(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), LM_TYPE_CHANNEL, LmChannel))
+#define LM_CHANNEL_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), LM_TYPE_CHANNEL, LmChannelClass))
+#define LM_IS_CHANNEL(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), LM_TYPE_CHANNEL))
+#define LM_IS_CHANNEL_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), LM_TYPE_CHANNEL))
+#define LM_CHANNEL_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), LM_TYPE_CHANNEL, LmChannelClass))
 
-typedef struct _LmChannel      LmChannel;
-typedef struct _LmChannelIface LmChannelIface;
+typedef struct LmChannel      LmChannel;
+typedef struct LmChannelClass LmChannelClass;
 
-struct _LmChannelIface {
-    GTypeInterface parent;
+struct LmChannel {
+    GObject parent;
+};
 
+struct LmChannelClass {
+    GObjectClass parent_class;
+    
     /* <vtable> */
     GIOStatus   (*read)       (LmChannel    *channel,
                                gchar        *buf,

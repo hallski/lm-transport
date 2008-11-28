@@ -42,11 +42,11 @@ typedef struct LmSecureChannel      LmSecureChannel;
 typedef struct LmSecureChannelClass LmSecureChannelClass;
 
 struct LmSecureChannel {
-    GObject parent;
+    LmChannel parent;
 };
 
 struct LmSecureChannelClass {
-    GObjectClass parent_class;
+    LmChannelClass parent_class;
     
     /* <vtable> */
     GIOStatus   (*secure_read)       (LmChannel    *channel,

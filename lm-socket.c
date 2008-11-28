@@ -49,7 +49,6 @@ typedef struct {
 
 typedef struct LmSocketPriv LmSocketPriv;
 struct LmSocketPriv {
-    GMainContext        *context;
     LmSocketAddress     *sa;
 
     LmSocketHandle       handle;
@@ -65,7 +64,6 @@ struct LmSocketPriv {
     LmSocketAddressIter *sa_iter;
 };
 
-static void      socket_channel_iface_init  (LmChannelIface    *iface);
 static void      socket_finalize            (GObject           *object);
 static void      socket_get_property        (GObject           *object,
                                              guint              param_id,
@@ -108,13 +106,10 @@ static void
 socket_emit_disconnected_and_cleanup        (LmSocket             *socket,
                                              LmChannelCloseReason  reason);
 
-G_DEFINE_TYPE_WITH_CODE (LmSocket, lm_socket, G_TYPE_OBJECT,
-                         G_IMPLEMENT_INTERFACE (LM_TYPE_CHANNEL,
-                                                socket_channel_iface_init))
+G_DEFINE_TYPE (LmSocket, lm_socket, LM_TYPE_CHANNEL)
 
 enum {
     PROP_0,
-    PROP_CONTEXT,
     PROP_ADDRESS
 };
 
@@ -128,18 +123,18 @@ static guint signals[LAST_SIGNAL] = { 0 };
 static void
 lm_socket_class_init (LmSocketClass *class)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS (class);
-    GParamSpec   *pspec;
+    GObjectClass   *object_class  = G_OBJECT_CLASS (class);
+    LmChannelClass *channel_class = LM_CHANNEL_CLASS (class);
+    GParamSpec     *pspec;
 
     object_class->finalize     = socket_finalize;
     object_class->get_property = socket_get_property;
     object_class->set_property = socket_set_property;
 
-    pspec = g_param_spec_pointer ("context",
-                                  "Main context",
-                                  "GMainContext to run this socket",
-                                  G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
-    g_object_class_install_property (object_class, PROP_CONTEXT, pspec);
+    channel_class->read      = socket_read;
+    channel_class->write     = socket_write;
+    channel_class->close     = socket_close;
+    channel_class->get_inner = socket_get_inner;
 
     pspec = g_param_spec_boxed ("address",
                                 "Socket address",
@@ -172,15 +167,6 @@ lm_socket_init (LmSocket *socket)
 }
 
 static void
-socket_channel_iface_init (LmChannelIface *iface)
-{
-    iface->read      = socket_read;
-    iface->write     = socket_write;
-    iface->close     = socket_close;
-    iface->get_inner = socket_get_inner;
-}
-
-static void
 socket_finalize (GObject *object)
 {
     LmSocketPriv *priv;
@@ -207,9 +193,6 @@ socket_get_property (GObject    *object,
     priv = GET_PRIV (object);
 
     switch (param_id) {
-        case PROP_CONTEXT:
-            g_value_set_pointer (value, priv->context);
-            break;
         case PROP_ADDRESS:
             g_value_set_boxed (value, priv->sa);
             break;
@@ -226,17 +209,10 @@ socket_set_property (GObject      *object,
                      GParamSpec   *pspec)
 {
     LmSocketPriv *priv;
-    GMainContext *context;
 
     priv = GET_PRIV (object);
 
     switch (param_id) {
-        case PROP_CONTEXT:
-            context = g_value_get_pointer (value);
-            if (context) {
-                priv->context = g_main_context_ref (context);
-            }
-            break;
         case PROP_ADDRESS:
             priv->sa = g_value_get_boxed (value);
             if (priv->sa) {
@@ -418,8 +394,9 @@ socket_attempt_connect_next (LmSocket *socket)
 static gboolean
 socket_attempt_connect (LmSocket *lm_socket, struct addrinfo *addr)
 {
-    LmSocketPriv    *priv;
-    int              res;
+    LmSocketPriv *priv;
+    int           res;
+    GMainContext *context;
 
     priv = GET_PRIV (lm_socket);
 
@@ -439,16 +416,18 @@ socket_attempt_connect (LmSocket *lm_socket, struct addrinfo *addr)
 
     _lm_sock_set_blocking (priv->handle, FALSE);
 
+    g_object_get (lm_socket, "context", &context, NULL);
+
     /* Check for OUT and ERR events as they will define when the asynchronous 
      * connect is done 
      */
-    priv->watches.out_watch = lm_misc_add_io_watch (priv->context,
+    priv->watches.out_watch = lm_misc_add_io_watch (context,
                                                     priv->io_channel,
                                                     G_IO_OUT,
                                                     (GIOFunc) socket_out_cb,
                                                     lm_socket);
 
-    priv->watches.err_watch = lm_misc_add_io_watch (priv->context,
+    priv->watches.err_watch = lm_misc_add_io_watch (context,
                                                     priv->io_channel,
                                                     G_IO_ERR,
                                                     (GIOFunc) socket_err_cb,
@@ -490,16 +469,20 @@ socket_out_cb (GIOChannel   *source,
     if (priv->connected) {
         g_signal_emit_by_name (socket, "writeable");
     } else {
+        GMainContext *context;
+
+        g_object_get (socket, "context", &context, NULL);
+
         /* Sucessful connect */
         priv->watches.in_watch = 
-            lm_misc_add_io_watch (priv->context,
+            lm_misc_add_io_watch (context,
                                   priv->io_channel,
                                   G_IO_IN,
                                   (GIOFunc) socket_in_cb,
                                   socket);
 
         priv->watches.hup_watch =
-            lm_misc_add_io_watch (priv->context,
+            lm_misc_add_io_watch (context,
                                   priv->io_channel,
                                   G_IO_HUP,
                                   (GIOFunc) socket_hup_cb,
@@ -570,7 +553,11 @@ lm_socket_connect (LmSocket *socket)
     priv = GET_PRIV (socket);
 
     if (!lm_socket_address_is_resolved (priv->sa)) {
-        priv->resolver = lm_resolver_lookup_host (priv->context, priv->sa);
+        GMainContext *context;
+
+        g_object_get (socket, "context", &context, NULL);
+
+        priv->resolver = lm_resolver_lookup_host (context, priv->sa);
         g_signal_connect (priv->resolver, "finished", 
                           G_CALLBACK (socket_resolver_finished_cb),
                           socket);

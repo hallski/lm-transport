@@ -41,6 +41,12 @@ G_BEGIN_DECLS
 #define LM_IS_CHANNEL_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), LM_TYPE_CHANNEL))
 #define LM_CHANNEL_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), LM_TYPE_CHANNEL, LmChannelClass))
 
+typedef enum {
+    LM_CHANNEL_CLOSE_REQUESTED,
+    LM_CHANNEL_CLOSE_HUP,
+    LM_CHANNEL_CLOSE_IO_ERROR,
+} LmChannelCloseReason;
+
 typedef struct LmChannel      LmChannel;
 typedef struct LmChannelClass LmChannelClass;
 
@@ -50,6 +56,14 @@ struct LmChannel {
 
 struct LmChannelClass {
     GObjectClass parent_class;
+
+    /* <signals> */
+    /* TODO: Connect these to the signals in .c-file */
+    void        (*opened)     (LmChannel            *channel);
+    void        (*readable)   (LmChannel            *channel);
+    void        (*writeable)  (LmChannel            *channel);
+    void        (*closed)     (LmChannel            *channel,
+                               LmChannelCloseReason  reason);
     
     /* <vtable> */
     GIOStatus   (*read)       (LmChannel    *channel,
@@ -67,12 +81,6 @@ struct LmChannelClass {
 
     LmChannel * (*get_inner)  (LmChannel   *channel);
 };
-
-typedef enum {
-    LM_CHANNEL_CLOSE_REQUESTED,
-    LM_CHANNEL_CLOSE_HUP,
-    LM_CHANNEL_CLOSE_IO_ERROR,
-} LmChannelCloseReason;
 
 GType          lm_channel_get_type          (void);
 

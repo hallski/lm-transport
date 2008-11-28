@@ -28,7 +28,9 @@
 typedef struct LmChannelPriv LmChannelPriv;
 struct LmChannelPriv {
     GMainContext *context;
-    gint my_prop;
+
+    LmChannel    *inner;
+    LmChannel    *outer;
 };
 
 static void     channel_finalize            (GObject           *object);
@@ -46,7 +48,8 @@ G_DEFINE_ABSTRACT_TYPE (LmChannel, lm_channel, G_TYPE_OBJECT)
 enum {
     PROP_0,
     PROP_CONTEXT,
-    PROP_MY_PROP
+    PROP_INNER_CHANNEL,
+    PROP_OUTER_CHANNEL
 };
 
 enum {
@@ -74,8 +77,21 @@ lm_channel_class_init (LmChannelClass *class)
                                   "Main context",
                                   "GMainContext to run this socket",
                                   G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
-    
     g_object_class_install_property (object_class, PROP_CONTEXT, pspec);
+
+    pspec = g_param_spec_object ("inner-channel",
+                                 "Inner channel",
+                                 "Channel encapsulated by this channel",
+                                 LM_TYPE_CHANNEL,
+                                 G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_INNER_CHANNEL, pspec);
+
+    pspec = g_param_spec_object ("outer-channel",
+                                 "Outer channel",
+                                 "Channel encapsulating by this channel",
+                                 LM_TYPE_CHANNEL,
+                                 G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_OUTER_CHANNEL, pspec);
 
  
     signals[OPENED] =
@@ -250,6 +266,4 @@ lm_channel_get_inner (LmChannel *channel)
 
     return LM_CHANNEL_GET_CLASS(channel)->get_inner (channel);
 }
-
-
 

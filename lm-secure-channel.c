@@ -32,8 +32,6 @@ struct LmSecureChannelPriv {
     gchar    *fingerprint;
 
     gboolean  encrypted;
-
-    gint my_prop;
 };
 
 static void       secure_channel_finalize     (GObject           *object);
@@ -52,8 +50,7 @@ enum {
     PROP_0,
     PROP_FINGERPRINT,
     PROP_EXPECTED_FINGERPRINT,
-    PROP_IS_SECURE,
-    PROP_MY_PROP
+    PROP_IS_SECURE
 };
 
 enum {

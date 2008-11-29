@@ -84,7 +84,6 @@ static GIOStatus socket_write               (LmChannel         *channel,
                                              gsize             *written_len,
                                              GError           **error);
 static void      socket_close               (LmChannel         *channel);
-static LmChannel * socket_get_inner         (LmChannel         *channel);
 static void      
 socket_attempt_connect_next                 (LmSocket          *socket);
 static gboolean  socket_attempt_connect     (LmSocket          *socket,
@@ -134,7 +133,6 @@ lm_socket_class_init (LmSocketClass *class)
     channel_class->read      = socket_read;
     channel_class->write     = socket_write;
     channel_class->close     = socket_close;
-    channel_class->get_inner = socket_get_inner;
 
     pspec = g_param_spec_boxed ("address",
                                 "Socket address",
@@ -273,13 +271,6 @@ socket_close (LmChannel *channel)
 
     socket_emit_disconnected_and_cleanup (LM_SOCKET (channel), 
                                           LM_CHANNEL_CLOSE_REQUESTED);
-}
-
-static LmChannel *
-socket_get_inner (LmChannel *channel)
-{
-    /* An LmSocket is the end station and it will never have an inner channel */
-    return NULL;
 }
 
 static void

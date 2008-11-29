@@ -78,8 +78,6 @@ struct LmChannelClass {
                                GError      **error);
 
     void        (*close)      (LmChannel    *channel);
-
-    LmChannel * (*get_inner)  (LmChannel   *channel);
 };
 
 GType          lm_channel_get_type          (void);

@@ -33,15 +33,27 @@ struct LmChannelPriv {
     LmChannel    *outer;
 };
 
-static void     channel_finalize            (GObject           *object);
-static void     channel_get_property        (GObject           *object,
-                                             guint              param_id,
-                                             GValue            *value,
-                                             GParamSpec        *pspec);
-static void     channel_set_property        (GObject           *object,
-                                             guint              param_id,
-                                             const GValue      *value,
-                                             GParamSpec        *pspec);
+static void       channel_finalize            (GObject           *object);
+static void       channel_get_property        (GObject           *object,
+                                               guint              param_id,
+                                               GValue            *value,
+                                               GParamSpec        *pspec);
+static void       channel_set_property        (GObject           *object,
+                                               guint              param_id,
+                                               const GValue      *value,
+                                               GParamSpec        *pspec);
+static GIOStatus  channel_default_read        (LmChannel         *channel,
+                                               gchar             *buf,
+                                               gsize              len,
+                                               gsize             *read_len,
+                                               GError           **error);
+static GIOStatus  channel_default_write       (LmChannel         *channel,
+                                               const gchar       *buf,
+                                               gssize             len,
+                                               gsize             *written_len,
+                                               GError           **error);
+
+static void       channel_default_close      (LmChannel          *channel);
 
 G_DEFINE_ABSTRACT_TYPE (LmChannel, lm_channel, G_TYPE_OBJECT)
 
@@ -64,14 +76,18 @@ enum {
 static guint signals[LAST_SIGNAL] = { 0 };
 
 static void
-lm_channel_class_init (LmChannelClass *class)
+lm_channel_class_init (LmChannelClass *channel_class)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS (class);
+    GObjectClass *object_class = G_OBJECT_CLASS (channel_class);
     GParamSpec   *pspec;
 
     object_class->finalize     = channel_finalize;
     object_class->get_property = channel_get_property;
     object_class->set_property = channel_set_property;
+
+    channel_class->read        = channel_default_read;
+    channel_class->write       = channel_default_write;
+    channel_class->close       = channel_default_close;
 
     pspec = g_param_spec_pointer ("context",
                                   "Main context",
@@ -215,6 +231,58 @@ channel_set_property (GObject      *object,
     };
 }
 
+static GIOStatus
+channel_default_read (LmChannel  *channel,
+                      gchar      *buf,
+                      gsize       len,
+                      gsize      *read_len,
+                      GError    **error)
+{
+    LmChannelPriv *priv;
+
+    g_return_val_if_fail (LM_IS_CHANNEL (channel), 
+                          G_IO_STATUS_ERROR);
+    
+    priv = GET_PRIV (channel);
+
+    g_print ("[LmChannel]: pass through read\n");
+    return lm_channel_read (priv->inner,
+                            buf, len, read_len, error);
+}
+
+static GIOStatus
+channel_default_write (LmChannel    *channel,
+                       const gchar  *buf,
+                       gssize        len,
+                       gsize        *written_len,
+                       GError      **error)
+{
+    LmChannelPriv *priv;
+
+    g_return_val_if_fail (LM_IS_CHANNEL (channel), 
+                          G_IO_STATUS_ERROR);
+    
+    priv = GET_PRIV (channel);
+   
+    g_print ("[LmChannel]: pass through write\n");
+    return lm_channel_write (priv->inner,
+                             buf, len, written_len, error);
+}
+
+static void
+channel_default_close (LmChannel *channel)
+{
+    LmChannelPriv *priv;
+
+    g_return_if_fail (LM_IS_CHANNEL (channel));
+    
+    priv = GET_PRIV (channel);
+   
+    g_print ("[LmChannel]: Pass through close\n");
+    return lm_channel_close (priv->inner);
+}
+
+
 GIOStatus 
 lm_channel_read (LmChannel *channel,
                  gchar     *buf,
@@ -261,18 +329,6 @@ lm_channel_close (LmChannel *channel)
     return LM_CHANNEL_GET_CLASS(channel)->close (channel);
 }
 
-LmChannel *
-lm_channel_get_inner (LmChannel *channel)
-{
-    g_return_val_if_fail (LM_IS_CHANNEL (channel), NULL);
-
-    if (!LM_CHANNEL_GET_CLASS(channel)->get_inner) {
-        g_assert_not_reached ();
-    }
-
-    return LM_CHANNEL_GET_CLASS(channel)->get_inner (channel);
-}
-
 static void
 channel_inner_opened_cb (LmChannel *inner, LmChannel *channel)
 {
@@ -297,6 +353,18 @@ channel_inner_closed_cb (LmChannel            *inner,
                          LmChannel            *channel)
 {
     g_signal_emit_by_name (channel, "closed", reason);
+}
+
+LmChannel *
+lm_channel_get_inner (LmChannel *channel)
+{
+    LmChannelPriv *priv;
+
+    g_return_val_if_fail (LM_IS_CHANNEL (channel), NULL);
+
+    priv = GET_PRIV (channel);
+
+    return priv->inner;
 }
 
 void

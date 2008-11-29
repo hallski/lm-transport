@@ -68,18 +68,35 @@ static void
 lm_secure_channel_class_init (LmSecureChannelClass *class)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (class);
+    GParamSpec   *pspec;
 
     object_class->finalize     = secure_channel_finalize;
     object_class->get_property = secure_channel_get_property;
     object_class->set_property = secure_channel_set_property;
 
-    g_object_class_install_property (object_class,
-                                     PROP_MY_PROP,
-                                     g_param_spec_string ("my-prop",
-                                                          "My Prop",
-                                                          "My Property",
-                                                          NULL,
-                                                          G_PARAM_READWRITE));
+    pspec = g_param_spec_string ("fingerprint",
+                                 "Fingerprint",
+                                 "Actual fingerprint",
+                                 NULL,
+                                 G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_FINGERPRINT, pspec);
+    
+    pspec = g_param_spec_string ("expected-fingerprint",
+                                 "Expected Fingerprint",
+                                 "Expected fingerprint",
+                                 NULL,
+                                 G_PARAM_READWRITE);
+
+    g_object_class_install_property (object_class, 
+                                     PROP_EXPECTED_FINGERPRINT, pspec);
+   
+    pspec = g_param_spec_boolean ("is-secure",
+                                  "Is secure",
+                                  "Whether the channel is encrypted",
+                                  FALSE,
+                                  G_PARAM_READWRITE);
+
+    g_object_class_install_property (object_class, PROP_IS_SECURE, pspec);
     
     signals[HANDSHAKE_RESULT] = 
         g_signal_new ("handshake-result",
@@ -124,12 +141,18 @@ secure_channel_get_property (GObject    *object,
     priv = GET_PRIV (object);
 
     switch (param_id) {
-    case PROP_MY_PROP:
-        g_value_set_int (value, priv->my_prop);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
-        break;
+        case PROP_FINGERPRINT:
+            g_value_set_string (value, priv->fingerprint);
+            break;
+        case PROP_EXPECTED_FINGERPRINT:
+            g_value_set_string (value, priv->expected_fingerprint);
+            break;
+         case PROP_IS_SECURE:
+            g_value_set_boolean (value, priv->encrypted);
+            break;
+        default:
+            G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
+            break;
     };
 }
 
@@ -144,12 +167,20 @@ secure_channel_set_property (GObject      *object,
     priv = GET_PRIV (object);
 
     switch (param_id) {
-    case PROP_MY_PROP:
-        priv->my_prop = g_value_get_int (value);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
-        break;
+        case PROP_FINGERPRINT:
+            g_free (priv->fingerprint);
+            priv->fingerprint = g_value_dup_string (value);
+            break;
+        case PROP_EXPECTED_FINGERPRINT:
+            g_free (priv->expected_fingerprint);
+            priv->expected_fingerprint = g_value_dup_string (value);
+            break;
+        case PROP_IS_SECURE:
+            priv->encrypted = g_value_get_boolean (value);
+            break;
+        default:
+            G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
+            break;
     };
 }
 

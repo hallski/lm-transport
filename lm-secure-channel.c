@@ -114,7 +114,6 @@ lm_secure_channel_init (LmSecureChannel *secure_channel)
     LmSecureChannelPriv *priv;
 
     priv = GET_PRIV (secure_channel);
-
 }
 
 static void

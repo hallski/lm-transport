@@ -29,6 +29,8 @@
 
 #include <glib-object.h>
 
+#include "lm-channel.h"
+
 G_BEGIN_DECLS
 
 #define LM_TYPE_SECURE_CHANNEL            (lm_secure_channel_get_type ())
@@ -49,17 +51,18 @@ struct LmSecureChannelClass {
     LmChannelClass parent_class;
     
     /* <vtable> */
-    GIOStatus   (*secure_read)       (LmChannel    *channel,
-                                      gchar        *buf,
-                                      gsize         count,
-                                      gsize        *bytes_read,
-                                      GError      **error);
-    GIOStatus   (*secure_write)      (LmChannel    *channel,
-                                      const gchar  *buf,
-                                      gssize        count,
-                                      gsize        *bytes_written,
-                                      GError      **error);
-    void        (*secure_close)      (LmChannel    *channel);
+    void        (*start_handshake)   (LmSecureChannel  *channel);
+    GIOStatus   (*secure_read)       (LmChannel        *channel,
+                                      gchar            *buf,
+                                      gsize             count,
+                                      gsize            *bytes_read,
+                                      GError          **error);
+    GIOStatus   (*secure_write)      (LmChannel        *channel,
+                                      const gchar      *buf,
+                                      gssize            count,
+                                      gsize            *bytes_written,
+                                      GError          **error);
+    void        (*secure_close)      (LmChannel        *channel);
 };
 
 GType   lm_secure_channel_get_type        (void);

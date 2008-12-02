@@ -23,6 +23,8 @@ set(SOURCES
 	lm-dummy.h
 	lm-error.c
 	lm-error.h
+	lm-gnutls-channel.c
+	lm-gnutls-channel.h
 	lm-idummy.c
 	lm-idummy.h
 	lm-marshal.c

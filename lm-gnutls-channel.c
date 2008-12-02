@@ -28,9 +28,12 @@
 
 #define GET_PRIV(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), LM_TYPE_GNUTLS_CHANNEL, LmGnuTLSChannelPriv))
 
+#define CA_PEM_FILE "/etc/ssl/certs/ca-certificates.crt"
+
 typedef struct LmGnuTLSChannelPriv LmGnuTLSChannelPriv;
 struct LmGnuTLSChannelPriv {
-    gnutls_session session;
+    gnutls_session gnutls_session;
+    gnutls_certificate_credentials gnutls_xcred;
 
     gint my_prop;
 };
@@ -44,6 +47,8 @@ static void       gnutls_channel_set_property  (GObject           *object,
                                                 guint              param_id,
                                                 const GValue      *value,
                                                 GParamSpec        *pspec);
+static void       gnutls_channel_init_gnutls   (LmGnuTLSChannel   *channel);
+static void       gnutls_channel_deinit_gnutls (LmGnuTLSChannel   *channel);
 static GIOStatus  gnutls_channel_read          (LmChannel         *channel,
                                                 gchar             *buf,
                                                 gsize              count,
@@ -106,7 +111,7 @@ lm_gnutls_channel_class_init (LmGnuTLSChannelClass *class)
                       _lm_marshal_VOID__INT,
                       G_TYPE_NONE, 
                       1, G_TYPE_INT);
-    
+
     g_type_class_add_private (object_class, sizeof (LmGnuTLSChannelPriv));
 }
 
@@ -117,6 +122,7 @@ lm_gnutls_channel_init (LmGnuTLSChannel *gnutls_channel)
 
     priv = GET_PRIV (gnutls_channel);
 
+    gnutls_channel_init_gnutls (gnutls_channel);
 }
 
 static void
@@ -125,6 +131,8 @@ gnutls_channel_finalize (GObject *object)
     LmGnuTLSChannelPriv *priv;
 
     priv = GET_PRIV (object);
+
+    gnutls_channel_deinit_gnutls (LM_GNUTLS_CHANNEL (object));
 
     (G_OBJECT_CLASS (lm_gnutls_channel_parent_class)->finalize) (object);
 }
@@ -168,6 +176,49 @@ gnutls_channel_set_property (GObject      *object,
         break;
     };
 }
+
+static void
+gnutls_channel_init_gnutls (LmGnuTLSChannel *channel)
+{
+    LmGnuTLSChannelPriv *priv = GET_PRIV (channel);
+
+    const int cert_type_priority[] =
+        { GNUTLS_CRT_X509, GNUTLS_CRT_OPENPGP, 0 };
+    const int compression_priority[] =
+    { GNUTLS_COMP_DEFLATE, GNUTLS_COMP_NULL, 0 };
+
+    /* TODO: This function is not thread safe    */
+    /*       Only call once ensure thread safety */
+    gnutls_global_init ();
+    gnutls_certificate_allocate_credentials (&priv->gnutls_xcred);
+    gnutls_certificate_set_x509_trust_file(priv->gnutls_xcred,
+                                           CA_PEM_FILE,
+                                           GNUTLS_X509_FMT_PEM);
+
+    gnutls_init (&priv->gnutls_session, GNUTLS_CLIENT);
+    gnutls_set_default_priority (priv->gnutls_session);
+    gnutls_certificate_type_set_priority (priv->gnutls_session,
+                                          cert_type_priority);
+    gnutls_compression_set_priority (priv->gnutls_session,
+                                     compression_priority);
+    gnutls_credentials_set (priv->gnutls_session,
+                            GNUTLS_CRD_CERTIFICATE,
+                            priv->gnutls_xcred);
+
+    gnutls_transport_set_ptr (priv->gnutls_session,
+                              (gnutls_transport_ptr_t)(glong) channel);
+}
+
+static void
+gnutls_channel_deinit_gnutls (LmGnuTLSChannel *channel)
+{
+    LmGnuTLSChannelPriv *priv = GET_PRIV (channel);
+
+    gnutls_deinit (priv->gnutls_session);
+    gnutls_certificate_free_credentials (priv->gnutls_xcred);
+    gnutls_global_deinit ();
+}
+
 
 static GIOStatus
 gnutls_channel_read (LmChannel  *channel,

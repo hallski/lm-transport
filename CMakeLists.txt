@@ -2,10 +2,13 @@ cmake_minimum_required(VERSION 2.6)
 
 project(LmTransports C)
 
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR})
+
 find_package(PkgConfig REQUIRED)
 
 include(Warnings.cmake)
 include(GenMarshal.cmake)
+include(SelectSSL.cmake)
 
 include(ConfigureChecks.cmake)
 configure_file(config.h.cmake config.h)
@@ -13,6 +16,10 @@ configure_file(config.h.cmake config.h)
 pkg_check_modules(LM REQUIRED
 	glib-2.0
 	gobject-2.0)
+
+set(LM_LIBRARIES ${LM_LIBRARIES} ${SSL_LIBRARIES})
+set(LM_INCLUDE_DIRS ${LM_INCLUDE_DIRS} ${SSL_INCLUDE_DIRS})
+set(LM_LIBRARY_DIRS ${LM_LIBRARY_DIRS} ${SSL_LIBRARY_DIRS})
 
 set(SOURCES
 	asyncns.c

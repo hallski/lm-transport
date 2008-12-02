@@ -181,12 +181,7 @@ static void
 gnutls_channel_init_gnutls (LmGnuTLSChannel *channel)
 {
     LmGnuTLSChannelPriv *priv = GET_PRIV (channel);
-
-    const int cert_type_priority[] =
-        { GNUTLS_CRT_X509, GNUTLS_CRT_OPENPGP, 0 };
-    const int compression_priority[] =
-    { GNUTLS_COMP_DEFLATE, GNUTLS_COMP_NULL, 0 };
-
+    
     /* TODO: This function is not thread safe    */
     /*       Only call once ensure thread safety */
     gnutls_global_init ();
@@ -194,6 +189,111 @@ gnutls_channel_init_gnutls (LmGnuTLSChannel *channel)
     gnutls_certificate_set_x509_trust_file(priv->gnutls_xcred,
                                            CA_PEM_FILE,
                                            GNUTLS_X509_FMT_PEM);
+
+}
+
+static void
+gnutls_channel_deinit_gnutls (LmGnuTLSChannel *channel)
+{
+    LmGnuTLSChannelPriv *priv = GET_PRIV (channel);
+
+    gnutls_certificate_free_credentials (priv->gnutls_xcred);
+    gnutls_global_deinit ();
+}
+
+
+static GIOStatus
+gnutls_channel_read (LmChannel  *channel,
+                     gchar      *buf,
+                     gsize       count,
+                     gsize      *bytes_read,
+                     GError    **error)
+{
+    LmGnuTLSChannelPriv *priv;
+    GIOStatus            status;
+    gint                 b_read;
+
+    g_return_val_if_fail (LM_IS_GNUTLS_CHANNEL (channel), 
+                          G_IO_STATUS_ERROR);
+
+    priv = GET_PRIV (channel);
+
+    /* Check if we are setup with encryption, otherwise call parents read */
+
+    *bytes_read = 0;
+    b_read = gnutls_record_recv (priv->gnutls_session, buf, count);
+
+    if (b_read == GNUTLS_E_AGAIN) {
+        status = G_IO_STATUS_AGAIN;
+    }
+    else if (b_read == 0) {
+        status = G_IO_STATUS_EOF;
+    }
+    else if (b_read < 0) {
+        status = G_IO_STATUS_ERROR;
+    } else {
+        *bytes_read = (guint) b_read;
+        status = G_IO_STATUS_NORMAL;
+    }
+
+    /* TODO: Set GError */
+    return status;
+}
+
+static GIOStatus
+gnutls_channel_write (LmChannel    *channel,
+                      const gchar  *buf,
+                      gssize        count,
+                      gsize        *bytes_written,
+                      GError      **error)
+{
+    LmGnuTLSChannelPriv *priv;
+
+    g_return_val_if_fail (LM_IS_GNUTLS_CHANNEL (channel),
+                          G_IO_STATUS_ERROR);
+
+    priv = GET_PRIV (channel);
+
+    /* Check if we are setup with encryption, otherwise call parents write */
+
+    *bytes_written = gnutls_record_send (priv->gnutls_session, buf, count);
+
+    while (*bytes_written < 0) {
+        if (*bytes_written != GNUTLS_E_INTERRUPTED &&
+            *bytes_written != GNUTLS_E_AGAIN) {
+            return -1;
+        }
+    
+        *bytes_written = gnutls_record_send (priv->gnutls_session, 
+                                             buf, count);
+    }
+
+    return G_IO_STATUS_NORMAL;
+}
+
+static void
+gnutls_channel_close (LmChannel *channel)
+{
+    LmGnuTLSChannelPriv *priv;
+
+    g_return_if_fail (LM_IS_GNUTLS_CHANNEL (channel));
+
+    priv = GET_PRIV (channel);
+
+    /* Check if we have encryption going and deinit if we do */
+    gnutls_deinit (priv->gnutls_session);
+}
+
+static void
+gnutls_channel_start_handshake (LmSecureChannel *channel)
+{
+    LmGnuTLSChannelPriv *priv = GET_PRIV (channel);
+
+    const int cert_type_priority[] =
+        { GNUTLS_CRT_X509, GNUTLS_CRT_OPENPGP, 0 };
+    const int compression_priority[] =
+    { GNUTLS_COMP_DEFLATE, GNUTLS_COMP_NULL, 0 };
+
 
     gnutls_init (&priv->gnutls_session, GNUTLS_CLIENT);
     gnutls_set_default_priority (priv->gnutls_session);
@@ -207,48 +307,6 @@ gnutls_channel_init_gnutls (LmGnuTLSChannel *channel)
 
     gnutls_transport_set_ptr (priv->gnutls_session,
                               (gnutls_transport_ptr_t)(glong) channel);
-}
-
-static void
-gnutls_channel_deinit_gnutls (LmGnuTLSChannel *channel)
-{
-    LmGnuTLSChannelPriv *priv = GET_PRIV (channel);
-
-    gnutls_deinit (priv->gnutls_session);
-    gnutls_certificate_free_credentials (priv->gnutls_xcred);
-    gnutls_global_deinit ();
-}
-
-
-static GIOStatus
-gnutls_channel_read (LmChannel  *channel,
-                     gchar      *buf,
-                     gsize       count,
-                     gsize      *bytes_read,
-                     GError    **error)
-{
-    return G_IO_STATUS_ERROR;
-}
-
-static GIOStatus
-gnutls_channel_write (LmChannel    *channel,
-                      const gchar  *buf,
-                      gssize        count,
-                      gsize        *bytes_written,
-                      GError      **error)
-{
-    return G_IO_STATUS_ERROR;
-}
-
-static void
-gnutls_channel_close (LmChannel *channel)
-{
-
-}
-
-static void
-gnutls_channel_start_handshake (LmSecureChannel *channel)
-{
 }
 
 

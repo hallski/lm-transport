@@ -51,6 +51,7 @@ struct LmSecureChannelClass {
     LmChannelClass parent_class;
     
     /* <vtable> */
+    gboolean    (*is_encrypted)      (LmSecureChannel  *channel);
     void        (*start_handshake)   (LmSecureChannel  *channel);
     GIOStatus   (*secure_read)       (LmChannel        *channel,
                                       gchar            *buf,
@@ -76,7 +77,7 @@ LmChannel    * lm_secure_channel_new      (GMainContext *context,
  * A set of SSL errors that might occur
  *
  */
-
+gboolean      lm_secure_channel_is_encrypted    (LmSecureChannel *channel);
 void          lm_secure_channel_start_handshake (LmSecureChannel *channel);
 
 const gchar * lm_secure_channel_get_fingerprint (LmSecureChannel *channel);

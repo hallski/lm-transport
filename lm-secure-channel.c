@@ -30,8 +30,6 @@ typedef struct LmSecureChannelPriv LmSecureChannelPriv;
 struct LmSecureChannelPriv {
     gchar    *expected_fingerprint;
     gchar    *fingerprint;
-
-    gboolean  encrypted;
 };
 
 static void       secure_channel_finalize     (GObject           *object);
@@ -49,8 +47,7 @@ G_DEFINE_TYPE (LmSecureChannel, lm_secure_channel, LM_TYPE_CHANNEL)
 enum {
     PROP_0,
     PROP_FINGERPRINT,
-    PROP_EXPECTED_FINGERPRINT,
-    PROP_IS_SECURE
+    PROP_EXPECTED_FINGERPRINT
 };
 
 enum {
@@ -87,14 +84,6 @@ lm_secure_channel_class_init (LmSecureChannelClass *class)
     g_object_class_install_property (object_class, 
                                      PROP_EXPECTED_FINGERPRINT, pspec);
    
-    pspec = g_param_spec_boolean ("is-secure",
-                                  "Is secure",
-                                  "Whether the channel is encrypted",
-                                  FALSE,
-                                  G_PARAM_READWRITE);
-
-    g_object_class_install_property (object_class, PROP_IS_SECURE, pspec);
-    
     signals[HANDSHAKE_RESULT] = 
         g_signal_new ("handshake-result",
                       G_OBJECT_CLASS_TYPE (object_class),
@@ -143,9 +132,6 @@ secure_channel_get_property (GObject    *object,
         case PROP_EXPECTED_FINGERPRINT:
             g_value_set_string (value, priv->expected_fingerprint);
             break;
-         case PROP_IS_SECURE:
-            g_value_set_boolean (value, priv->encrypted);
-            break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
             break;
@@ -171,9 +157,6 @@ secure_channel_set_property (GObject      *object,
             g_free (priv->expected_fingerprint);
             priv->expected_fingerprint = g_value_dup_string (value);
             break;
-        case PROP_IS_SECURE:
-            priv->encrypted = g_value_get_boolean (value);
-            break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
             break;
@@ -193,3 +176,16 @@ lm_secure_channel_new (GMainContext *context, LmChannel *inner_channel)
 
     return channel;
 }
+
+gboolean
+lm_secure_channel_is_encrypted (LmSecureChannel *channel)
+{
+    g_return_val_if_fail (LM_IS_SECURE_CHANNEL (channel), FALSE);
+
+    if (!LM_SECURE_CHANNEL_GET_CLASS(channel)->is_encrypted) {
+        g_assert_not_reached ();
+    }
+
+    return LM_SECURE_CHANNEL_GET_CLASS(channel)->is_encrypted (channel);
+}
+

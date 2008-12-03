@@ -32,21 +32,11 @@
 
 typedef struct LmGnuTLSChannelPriv LmGnuTLSChannelPriv;
 struct LmGnuTLSChannelPriv {
-    gnutls_session gnutls_session;
+    gnutls_session                 gnutls_session;
     gnutls_certificate_credentials gnutls_xcred;
-
-    gint my_prop;
 };
 
 static void       gnutls_channel_finalize      (GObject           *object);
-static void       gnutls_channel_get_property  (GObject           *object,
-                                                guint              param_id,
-                                                GValue            *value,
-                                                GParamSpec        *pspec);
-static void       gnutls_channel_set_property  (GObject           *object,
-                                                guint              param_id,
-                                                const GValue      *value,
-                                                GParamSpec        *pspec);
 static void       gnutls_channel_init_gnutls   (LmGnuTLSChannel   *channel);
 static void       gnutls_channel_deinit_gnutls (LmGnuTLSChannel   *channel);
 static GIOStatus  gnutls_channel_read          (LmChannel         *channel,
@@ -71,18 +61,6 @@ static ssize_t    gnutls_channel_push_func     (LmGnuTLSChannel   *channel,
 
 G_DEFINE_TYPE (LmGnuTLSChannel, lm_gnutls_channel, LM_TYPE_SECURE_CHANNEL)
 
-enum {
-    PROP_0,
-    PROP_MY_PROP
-};
-
-enum {
-    SIGNAL_NAME,
-    LAST_SIGNAL
-};
-
-static guint signals[LAST_SIGNAL] = { 0 };
-
 static void
 lm_gnutls_channel_class_init (LmGnuTLSChannelClass *class)
 {
@@ -90,33 +68,13 @@ lm_gnutls_channel_class_init (LmGnuTLSChannelClass *class)
     LmChannelClass       *channel_class   = LM_CHANNEL_CLASS (class);
     LmSecureChannelClass *secure_ch_class = LM_SECURE_CHANNEL_CLASS (class);
 
-    object_class->finalize           = gnutls_channel_finalize;
-    object_class->get_property       = gnutls_channel_get_property;
-    object_class->set_property       = gnutls_channel_set_property;
+    object_class->finalize = gnutls_channel_finalize;
 
-    channel_class->read              = gnutls_channel_read;
-    channel_class->write             = gnutls_channel_write;
-    channel_class->close             = gnutls_channel_close;
+    channel_class->read    = gnutls_channel_read;
+    channel_class->write   = gnutls_channel_write;
+    channel_class->close   = gnutls_channel_close;
 
     secure_ch_class->start_handshake = gnutls_channel_start_handshake;
-
-    g_object_class_install_property (object_class,
-                                     PROP_MY_PROP,
-                                     g_param_spec_string ("my-prop",
-                                                          "My Prop",
-                                                          "My Property",
-                                                          NULL,
-                                                          G_PARAM_READWRITE));
-    
-    signals[SIGNAL_NAME] = 
-        g_signal_new ("signal-name",
-                      G_OBJECT_CLASS_TYPE (object_class),
-                      G_SIGNAL_RUN_LAST,
-                      0,
-                      NULL, NULL,
-                      _lm_marshal_VOID__INT,
-                      G_TYPE_NONE, 
-                      1, G_TYPE_INT);
 
     g_type_class_add_private (object_class, sizeof (LmGnuTLSChannelPriv));
 }
@@ -144,46 +102,6 @@ gnutls_channel_finalize (GObject *object)
 }
 
 static void
-gnutls_channel_get_property (GObject    *object,
-                             guint       param_id,
-                             GValue     *value,
-                             GParamSpec *pspec)
-{
-    LmGnuTLSChannelPriv *priv;
-
-    priv = GET_PRIV (object);
-
-    switch (param_id) {
-    case PROP_MY_PROP:
-        g_value_set_int (value, priv->my_prop);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
-        break;
-    };
-}
-
-static void
-gnutls_channel_set_property (GObject      *object,
-                             guint         param_id,
-                             const GValue *value,
-                             GParamSpec   *pspec)
-{
-    LmGnuTLSChannelPriv *priv;
-
-    priv = GET_PRIV (object);
-
-    switch (param_id) {
-    case PROP_MY_PROP:
-        priv->my_prop = g_value_get_int (value);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
-        break;
-    };
-}
-
-static void
 gnutls_channel_init_gnutls (LmGnuTLSChannel *channel)
 {
     LmGnuTLSChannelPriv *priv = GET_PRIV (channel);
@@ -195,7 +113,6 @@ gnutls_channel_init_gnutls (LmGnuTLSChannel *channel)
     gnutls_certificate_set_x509_trust_file(priv->gnutls_xcred,
                                            CA_PEM_FILE,
                                            GNUTLS_X509_FMT_PEM);
-
 }
 
 static void
@@ -206,7 +123,6 @@ gnutls_channel_deinit_gnutls (LmGnuTLSChannel *channel)
     gnutls_certificate_free_credentials (priv->gnutls_xcred);
     gnutls_global_deinit ();
 }
-
 
 static GIOStatus
 gnutls_channel_read (LmChannel  *channel,
@@ -227,22 +143,24 @@ gnutls_channel_read (LmChannel  *channel,
     /* Check if we are setup with encryption, otherwise call parents read */
 
     *bytes_read = 0;
-    b_read = gnutls_record_recv (priv->gnutls_session, buf, count);
+    do {
+        b_read = gnutls_record_recv (priv->gnutls_session, buf, count);
+    } while (b_read == GNUTLS_E_INTERRUPTED || b_read == GNUTLS_E_AGAIN);
 
-    if (b_read == GNUTLS_E_AGAIN) {
-        status = G_IO_STATUS_AGAIN;
-    }
-    else if (b_read == 0) {
-        status = G_IO_STATUS_EOF;
-    }
-    else if (b_read < 0) {
-        status = G_IO_STATUS_ERROR;
-    } else {
+    if (b_read > 0) {
         *bytes_read = (guint) b_read;
         status = G_IO_STATUS_NORMAL;
     }
+    else if (b_read < 0) {
+        status = G_IO_STATUS_ERROR;
+        *bytes_read = 0;
+        if (error != NULL) {
+            /* TODO: Set error */
+        }
+    } else { /* b_read == 0 */
+        status = G_IO_STATUS_EOF;
+    }
 
-    /* TODO: Set GError */
     return status;
 }
 
@@ -262,19 +180,17 @@ gnutls_channel_write (LmChannel    *channel,
 
     /* Check if we are setup with encryption, otherwise call parents write */
 
-    *bytes_written = gnutls_record_send (priv->gnutls_session, buf, count);
+    do {
+        *bytes_written = gnutls_record_send (priv->gnutls_session, buf, count);
+    } while (*bytes_written == GNUTLS_E_INTERRUPTED ||
+             *bytes_written == GNUTLS_E_AGAIN);
 
-    while (*bytes_written < 0) {
-        if (*bytes_written != GNUTLS_E_INTERRUPTED &&
-            *bytes_written != GNUTLS_E_AGAIN) {
-            return -1;
-        }
-    
-        *bytes_written = gnutls_record_send (priv->gnutls_session, 
-                                             buf, count);
-    }
-
-    return G_IO_STATUS_NORMAL;
+    if (*bytes_written >= 0) {
+        return G_IO_STATUS_NORMAL;
+    } else { /* Error */
+        /* TODO: Set error */
+        return G_IO_STATUS_ERROR;
+    } 
 }
 
 static void
@@ -285,8 +201,10 @@ gnutls_channel_close (LmChannel *channel)
     g_return_if_fail (LM_IS_GNUTLS_CHANNEL (channel));
 
     priv = GET_PRIV (channel);
-
+    
     /* Check if we have encryption going and deinit if we do */
+    gnutls_bye (priv->gnutls_session, GNUTLS_SHUT_RDWR);
+
     gnutls_deinit (priv->gnutls_session);
 }
 
@@ -324,7 +242,33 @@ gnutls_channel_pull_func (LmGnuTLSChannel *channel,
                           void            *buf,
                           size_t           count)
 {
-    return 0;
+    GIOStatus  status;
+    gsize      bytes_read;
+    ssize_t    ret_val;
+
+    status = lm_channel_read (lm_channel_get_inner (LM_CHANNEL (channel)), 
+                              buf, count, &bytes_read, NULL);
+
+    /* errno should be set by underlying LmSocket so no need to reset it here */
+    switch (status) {
+        case G_IO_STATUS_NORMAL:
+            ret_val = bytes_read;
+            break;
+
+        case G_IO_STATUS_EOF:
+            ret_val = 0;
+            break;
+        case G_IO_STATUS_AGAIN:
+        case G_IO_STATUS_ERROR:
+            ret_val = -1;
+            break;
+    } 
+
+    /* Use this? gnutls_transport_set_errno (priv->gnutls_session, errno)? */
+    /* Should possibly be used to signal back error from G_IO_STATUS to the
+     * GnuTLS layer
+     */
+    return ret_val;
 }
 
 static ssize_t 
@@ -332,5 +276,26 @@ gnutls_channel_push_func (LmGnuTLSChannel *channel,
                           const void      *buf,
                           size_t           count)
 {
-    return 0;
+    GIOStatus  status;
+    gsize      bytes_written;
+    ssize_t    ret_val;
+
+    status = lm_channel_write (lm_channel_get_inner (LM_CHANNEL (channel)),
+                               buf, count, &bytes_written, NULL);
+    
+    /* errno should be set by underlying LmSocket so no need to reset it here */
+    switch (status) {
+        case G_IO_STATUS_NORMAL:
+            ret_val = bytes_written;
+            break;
+        case G_IO_STATUS_EOF:
+            ret_val = 0;
+            break;
+        case G_IO_STATUS_AGAIN:
+        case G_IO_STATUS_ERROR:
+            ret_val = -1;
+            break;
+    }
+
+    return ret_val;
 }

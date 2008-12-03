@@ -21,6 +21,7 @@
 #include <config.h>
 
 #include "lm-channel.h"
+#include "lm-gnutls-channel.h"
 #include "lm-marshal.h"
 #include "lm-secure-channel.h"
 
@@ -42,7 +43,7 @@ static void       secure_channel_set_property (GObject           *object,
                                                const GValue      *value,
                                                GParamSpec        *pspec);
 
-G_DEFINE_TYPE (LmSecureChannel, lm_secure_channel, LM_TYPE_CHANNEL)
+G_DEFINE_ABSTRACT_TYPE (LmSecureChannel, lm_secure_channel, LM_TYPE_CHANNEL)
 
 enum {
     PROP_0,
@@ -169,7 +170,7 @@ lm_secure_channel_new (GMainContext *context, LmChannel *inner_channel)
     LmChannel           *channel;
     LmSecureChannelPriv *priv;
 
-    channel = g_object_new (LM_TYPE_SECURE_CHANNEL, NULL);
+    channel = g_object_new (LM_TYPE_GNUTLS_CHANNEL, NULL);
     priv    = GET_PRIV (channel);
 
     lm_channel_set_inner (channel, inner_channel);

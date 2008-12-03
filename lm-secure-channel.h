@@ -75,6 +75,7 @@ struct LmSecureChannelClass {
     gboolean    (*is_encrypted)      (LmSecureChannel  *channel);
     void        (*start_handshake)   (LmSecureChannel  *channel,
                                       const gchar      *host);
+
     GIOStatus   (*secure_read)       (LmChannel        *channel,
                                       gchar            *buf,
                                       gsize             count,

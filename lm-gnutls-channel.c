@@ -35,6 +35,8 @@ typedef struct LmGnuTLSChannelPriv LmGnuTLSChannelPriv;
 struct LmGnuTLSChannelPriv {
     gnutls_session                 gnutls_session;
     gnutls_certificate_credentials gnutls_xcred;
+
+    gboolean                       is_encrypted;
 };
 
 static void       gnutls_channel_finalize      (GObject           *object);
@@ -87,6 +89,8 @@ lm_gnutls_channel_init (LmGnuTLSChannel *gnutls_channel)
     LmGnuTLSChannelPriv *priv;
 
     priv = GET_PRIV (gnutls_channel);
+
+    priv->is_encrypted = FALSE;
 
     gnutls_channel_init_gnutls (gnutls_channel);
 }
@@ -142,11 +146,17 @@ gnutls_channel_read (LmChannel  *channel,
 
     priv = GET_PRIV (channel);
 
-    /* Check if we are setup with encryption, otherwise call parents read */
+    if (!priv->is_encrypted) {
+        /* Until we are encrypted, use read from inner channel */
+        return lm_channel_read (lm_channel_get_inner (channel),
+                                buf, count, bytes_read, error);
+    }
 
     *bytes_read = 0;
     do {
+        g_print ("RECV\n");
         b_read = gnutls_record_recv (priv->gnutls_session, buf, count);
+        g_print ("RECV done\n");
     } while (b_read == GNUTLS_E_INTERRUPTED || b_read == GNUTLS_E_AGAIN);
 
     if (b_read > 0) {
@@ -163,6 +173,7 @@ gnutls_channel_read (LmChannel  *channel,
         status = G_IO_STATUS_EOF;
     }
 
+    g_print ("Time to return\n");
     return status;
 }
 
@@ -180,10 +191,16 @@ gnutls_channel_write (LmChannel    *channel,
 
     priv = GET_PRIV (channel);
 
-    /* Check if we are setup with encryption, otherwise call parents write */
+    if (!priv->is_encrypted) {
+        /* Until we are encrypted, use write from inner channel */
+        return lm_channel_write (lm_channel_get_inner (channel),
+                                 buf, count, bytes_written, error);
+    }
 
     do {
+        g_print ("SEND\n");
         *bytes_written = gnutls_record_send (priv->gnutls_session, buf, count);
+        g_print ("SEND done\n");
     } while (*bytes_written == GNUTLS_E_INTERRUPTED ||
              *bytes_written == GNUTLS_E_AGAIN);
 
@@ -203,11 +220,13 @@ gnutls_channel_close (LmChannel *channel)
     g_return_if_fail (LM_IS_GNUTLS_CHANNEL (channel));
 
     priv = GET_PRIV (channel);
-    
-    /* Check if we have encryption going and deinit if we do */
-    gnutls_bye (priv->gnutls_session, GNUTLS_SHUT_RDWR);
-
-    gnutls_deinit (priv->gnutls_session);
+   
+    if (priv->is_encrypted) {
+        gnutls_bye (priv->gnutls_session, GNUTLS_SHUT_RDWR);
+        gnutls_deinit (priv->gnutls_session);
+    }
+        
+    lm_channel_close (lm_channel_get_inner (channel));
 }
 
 static gboolean
@@ -386,6 +405,9 @@ gnutls_channel_start_handshake (LmSecureChannel *channel,
     }
 
     if (ret < 0 || !auth_ok) {
+        /* TODO: Signal through handshake result signal */
+#if 0
+
         char *errmsg;
 
         if (!auth_ok) {
@@ -394,13 +416,15 @@ gnutls_channel_start_handshake (LmSecureChannel *channel,
             errmsg = "handshake failed";
         }
 
-#if 0
         g_set_error (error, 
                      LM_ERROR, LM_ERROR_CONNECTION_OPEN,
                      "*** GNUTLS %s: %s",
                      errmsg, gnutls_strerror (ret));                    
 #endif
     }
+
+    g_print ("HANDSHAKE\n");
+    priv->is_encrypted = TRUE;
 }
 
 static ssize_t
@@ -430,10 +454,6 @@ gnutls_channel_pull_func (LmGnuTLSChannel *channel,
             break;
     } 
 
-    /* Use this? gnutls_transport_set_errno (priv->gnutls_session, errno)? */
-    /* Should possibly be used to signal back error from G_IO_STATUS to the
-     * GnuTLS layer
-     */
     return ret_val;
 }
 

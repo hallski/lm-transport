@@ -20,10 +20,12 @@ static GMainLoop *loop;
 static void
 channel_opened (LmChannel *channel) 
 {
-    lm_channel_write (channel, MESSAGE, (gssize)strlen (MESSAGE), NULL, NULL);
+    lm_secure_channel_start_handshake (LM_SECURE_CHANNEL (channel), host);
+    /*lm_channel_write (channel, MESSAGE, (gssize)strlen (MESSAGE), NULL, NULL) */
 }
 
-static void
+/*
+ * static void
 write_some (LmChannel *channel)
 {
     static int foo = 0;
@@ -37,6 +39,7 @@ write_some (LmChannel *channel)
 
     lm_channel_close (channel);
 }
+*/
 
 static void
 channel_readable (LmChannel *channel)
@@ -50,20 +53,7 @@ channel_readable (LmChannel *channel)
     buf[read_len] = '\0';
 
     g_print ("Read: %s\n", buf);
-    write_some (channel);
-}
-
-static void
-socket_connected (LmSocket              *socket,
-                  LmSocketConnectResult  res, 
-                  gpointer               user_data)
-{
-    g_print ("Connect callback: %d\n", res);
-
-    if (res != LM_SOCKET_CONNECT_OK) {
-        g_print ("Failed to connect\n");
-        g_main_loop_quit (loop);
-    }
+    /* write_some (channel); */
 }
 
 static void
@@ -87,12 +77,39 @@ channel_closed (LmChannel *channel, LmChannelCloseReason reason)
     g_main_loop_quit (loop);
 }
 
+static void
+socket_connected (LmSocket              *socket,
+                  LmSocketConnectResult  res, 
+                  gpointer               user_data)
+{
+    LmChannel *secure;
+
+    g_print ("Connect callback: %d\n", res);
+
+    if (res != LM_SOCKET_CONNECT_OK) {
+        g_print ("Failed to connect\n");
+        g_main_loop_quit (loop);
+    }
+
+    secure = lm_secure_channel_new (NULL, LM_CHANNEL (socket));
+
+    g_signal_connect (secure, "opened",
+                      G_CALLBACK (channel_opened),
+                      NULL);
+    g_signal_connect (secure, "readable",
+                      G_CALLBACK (channel_readable),
+                      NULL);
+    g_signal_connect (secure, "closed",
+                      G_CALLBACK (channel_closed),
+                      NULL);
+
+}
+
 int
 main (int argc, char **argv)
 {
     LmSocketAddress *sa;
     LmChannel       *socket;
-    LmChannel       *secure;
 
     g_type_init ();
 
@@ -114,18 +131,7 @@ main (int argc, char **argv)
                       NULL);
     lm_socket_connect (LM_SOCKET (socket));
 
-    secure = lm_secure_channel_new (NULL, socket);
-
-    g_signal_connect (secure, "opened",
-                      G_CALLBACK (channel_opened),
-                      NULL);
-    g_signal_connect (secure, "readable",
-                      G_CALLBACK (channel_readable),
-                      NULL);
-    g_signal_connect (secure, "closed",
-                      G_CALLBACK (channel_closed),
-                      NULL);
-
+  
     loop = g_main_loop_new (NULL, FALSE);
 
     g_main_loop_run (loop);

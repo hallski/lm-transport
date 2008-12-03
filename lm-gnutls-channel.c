@@ -139,9 +139,9 @@ gnutls_channel_finalize (GObject *object)
 
 static void
 gnutls_channel_get_property (GObject    *object,
-                    guint       param_id,
-                    GValue     *value,
-                    GParamSpec *pspec)
+                             guint       param_id,
+                             GValue     *value,
+                             GParamSpec *pspec)
 {
     LmGnuTLSChannelPriv *priv;
 
@@ -159,9 +159,9 @@ gnutls_channel_get_property (GObject    *object,
 
 static void
 gnutls_channel_set_property (GObject      *object,
-                    guint         param_id,
-                    const GValue *value,
-                    GParamSpec   *pspec)
+                             guint         param_id,
+                             const GValue *value,
+                             GParamSpec   *pspec)
 {
     LmGnuTLSChannelPriv *priv;
 

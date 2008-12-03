@@ -62,6 +62,12 @@ static GIOStatus  gnutls_channel_write         (LmChannel         *channel,
 static void       gnutls_channel_close         (LmChannel         *channel);
 static void
 gnutls_channel_start_handshake                 (LmSecureChannel   *channel);
+static ssize_t    gnutls_channel_pull_func     (LmGnuTLSChannel   *channel,
+                                                void              *buf,
+                                                size_t             count);
+static ssize_t    gnutls_channel_push_func     (LmGnuTLSChannel   *channel,
+                                                const void        *buf,
+                                                size_t             count);
 
 G_DEFINE_TYPE (LmGnuTLSChannel, lm_gnutls_channel, LM_TYPE_SECURE_CHANNEL)
 
@@ -307,6 +313,25 @@ gnutls_channel_start_handshake (LmSecureChannel *channel)
 
     gnutls_transport_set_ptr (priv->gnutls_session,
                               (gnutls_transport_ptr_t)(glong) channel);
+
+    gnutls_transport_set_push_function (priv->gnutls_session,
+                                        (gnutls_push_func) gnutls_channel_push_func);
+    gnutls_transport_set_pull_function (priv->gnutls_session,
+                                        (gnutls_pull_func) gnutls_channel_pull_func);
 }
 
+static ssize_t
+gnutls_channel_pull_func (LmGnuTLSChannel *channel,
+                          void            *buf,
+                          size_t           count)
+{
+    return 0;
+}
 
+static ssize_t 
+gnutls_channel_push_func (LmGnuTLSChannel *channel,
+                          const void      *buf,
+                          size_t           count)
+{
+    return 0;
+}

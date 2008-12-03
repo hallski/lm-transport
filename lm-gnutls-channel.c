@@ -300,7 +300,6 @@ gnutls_channel_start_handshake (LmSecureChannel *channel)
     const int compression_priority[] =
     { GNUTLS_COMP_DEFLATE, GNUTLS_COMP_NULL, 0 };
 
-
     gnutls_init (&priv->gnutls_session, GNUTLS_CLIENT);
     gnutls_set_default_priority (priv->gnutls_session);
     gnutls_certificate_type_set_priority (priv->gnutls_session,

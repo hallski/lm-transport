@@ -21,6 +21,7 @@
 #include <config.h>
 
 #include <gnutls/x509.h>
+#include <string.h>
 
 #include "lm-marshal.h"
 #include "lm-secure-channel.h"
@@ -51,7 +52,8 @@ static GIOStatus  gnutls_channel_write         (LmChannel         *channel,
                                                 GError           **error);
 static void       gnutls_channel_close         (LmChannel         *channel);
 static void
-gnutls_channel_start_handshake                 (LmSecureChannel   *channel);
+gnutls_channel_start_handshake                 (LmSecureChannel   *channel,
+                                                const gchar       *host);
 static ssize_t    gnutls_channel_pull_func     (LmGnuTLSChannel   *channel,
                                                 void              *buf,
                                                 size_t             count);
@@ -208,11 +210,151 @@ gnutls_channel_close (LmChannel *channel)
     gnutls_deinit (priv->gnutls_session);
 }
 
-static void
-gnutls_channel_start_handshake (LmSecureChannel *channel)
+static gboolean
+gnutls_channel_request_user_cert_feedback (LmGnuTLSChannel *channel,
+                                           LmSSLStatus      status)
+{
+    LmSSLResponse response;
+
+    /* TODO: Implement */
+#if 0
+    if (rc != 0) {
+        if (base->func (ssl,
+                        LM_SSL_STATUS_GENERIC_ERROR,
+                        base->func_data) != LM_SSL_RESPONSE_CONTINUE) { }
+    }
+#endif
+
+    response = LM_SSL_RESPONSE_CONTINUE;
+
+    if (response == LM_SSL_RESPONSE_CONTINUE) {
+        return TRUE;
+    } else {
+        return FALSE;
+    }
+
+}
+
+static gboolean
+gnutls_channel_verify_certificate (LmGnuTLSChannel *channel, 
+                                   const gchar     *server)
 {
     LmGnuTLSChannelPriv *priv = GET_PRIV (channel);
+	unsigned int         status;
+	int                  rc;
 
+	/* This verification function uses the trusted CAs in the credentials
+	 * structure. So you must have installed one or more CA certificates.
+	 */
+	rc = gnutls_certificate_verify_peers2 (priv->gnutls_session, &status);
+
+    if (rc == GNUTLS_E_NO_CERTIFICATE_FOUND) {
+        if (!gnutls_channel_request_user_cert_feedback (channel, LM_SSL_STATUS_NO_CERT_FOUND)) {
+            return FALSE;
+		}
+	}
+
+	if (rc != 0) {
+        if (!gnutls_channel_request_user_cert_feedback (channel, LM_SSL_STATUS_GENERIC_ERROR)) {
+            return FALSE;
+        }
+	}
+
+	if (rc == GNUTLS_E_NO_CERTIFICATE_FOUND) {
+        if (!gnutls_channel_request_user_cert_feedback (channel, LM_SSL_STATUS_NO_CERT_FOUND)) {
+			return FALSE;
+		}
+	}
+	
+	if (status & GNUTLS_CERT_INVALID
+        || status & GNUTLS_CERT_REVOKED) {
+		if (!gnutls_channel_request_user_cert_feedback (channel, LM_SSL_STATUS_UNTRUSTED_CERT)) {
+            return FALSE;
+		}
+	}
+	
+    if (gnutls_certificate_expiration_time_peers (priv->gnutls_session) < time (0)) {
+		if (!gnutls_channel_request_user_cert_feedback (channel, LM_SSL_STATUS_CERT_EXPIRED)) {
+			return FALSE;
+		}
+	}
+	
+	if (gnutls_certificate_activation_time_peers (priv->gnutls_session) > time (0)) {
+		if (!gnutls_channel_request_user_cert_feedback (channel, LM_SSL_STATUS_CERT_NOT_ACTIVATED)) {
+			return FALSE;
+		}
+	}
+	
+	if (gnutls_certificate_type_get (priv->gnutls_session) == GNUTLS_CRT_X509) {
+		const gnutls_datum *cert_list;
+        guint               cert_list_size;
+		size_t              digest_size;
+		gnutls_x509_crt     cert;
+        gchar              *expected_fingerprint;
+        gchar               fingerprint[20];
+		
+		cert_list = gnutls_certificate_get_peers (priv->gnutls_session,
+                                                  &cert_list_size);
+        if (cert_list == NULL) {
+            /* Signal ssl func */
+            if (!gnutls_channel_request_user_cert_feedback (channel, LM_SSL_STATUS_NO_CERT_FOUND)) {
+				return FALSE;
+			}
+		}
+
+		gnutls_x509_crt_init (&cert);
+
+        if (gnutls_x509_crt_import (cert, &cert_list[0],
+                                    GNUTLS_X509_FMT_DER) != 0) {
+            if (!gnutls_channel_request_user_cert_feedback (channel, LM_SSL_STATUS_NO_CERT_FOUND)) {
+				return FALSE;
+			}
+		}
+
+		if (!gnutls_x509_crt_check_hostname (cert, server)) {
+			if (!gnutls_channel_request_user_cert_feedback (channel, LM_SSL_STATUS_CERT_HOSTNAME_MISMATCH)) {
+				return FALSE;
+			}
+		}
+
+		gnutls_x509_crt_deinit (cert);
+
+        digest_size = sizeof (fingerprint);
+        g_object_get (channel, 
+                      "expected_fingerprint", &expected_fingerprint, NULL);
+
+		if (gnutls_fingerprint (GNUTLS_DIG_MD5, &cert_list[0],
+                                fingerprint,
+                                &digest_size) >= 0) {
+            if (expected_fingerprint &&
+                memcmp (expected_fingerprint, 
+                        fingerprint,
+                        digest_size) &&
+                !gnutls_channel_request_user_cert_feedback (channel, LM_SSL_STATUS_CERT_FINGERPRINT_MISMATCH)) {
+                g_free (expected_fingerprint);
+                return FALSE;
+            }
+        } 
+        else if (!gnutls_channel_request_user_cert_feedback (channel, LM_SSL_STATUS_GENERIC_ERROR)) {
+            g_free (expected_fingerprint);
+            return FALSE; 
+        } 
+
+        g_free (expected_fingerprint);
+        g_object_set (channel, "fingerprint", fingerprint, NULL);
+	}
+
+	return TRUE;
+}
+
+static void
+gnutls_channel_start_handshake (LmSecureChannel *channel, 
+                                const gchar     *host)
+{
+    LmGnuTLSChannelPriv *priv = GET_PRIV (channel);
+    int                  ret;
+    gboolean             auth_ok = TRUE;
+    
     const int cert_type_priority[] =
         { GNUTLS_CRT_X509, GNUTLS_CRT_OPENPGP, 0 };
     const int compression_priority[] =
@@ -235,6 +377,30 @@ gnutls_channel_start_handshake (LmSecureChannel *channel)
                                         (gnutls_push_func) gnutls_channel_push_func);
     gnutls_transport_set_pull_function (priv->gnutls_session,
                                         (gnutls_pull_func) gnutls_channel_pull_func);
+
+    /* TODO: Should be done asynchronously, look at async gnutls branch */
+    ret = gnutls_handshake (priv->gnutls_session);
+    if (ret >= 0) {
+        auth_ok = gnutls_channel_verify_certificate (LM_GNUTLS_CHANNEL (channel),
+                                                     host);
+    }
+
+    if (ret < 0 || !auth_ok) {
+        char *errmsg;
+
+        if (!auth_ok) {
+            errmsg = "authentication error";
+        } else {
+            errmsg = "handshake failed";
+        }
+
+#if 0
+        g_set_error (error, 
+                     LM_ERROR, LM_ERROR_CONNECTION_OPEN,
+                     "*** GNUTLS %s: %s",
+                     errmsg, gnutls_strerror (ret));                    
+#endif
+    }
 }
 
 static ssize_t

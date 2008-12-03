@@ -189,3 +189,16 @@ lm_secure_channel_is_encrypted (LmSecureChannel *channel)
     return LM_SECURE_CHANNEL_GET_CLASS(channel)->is_encrypted (channel);
 }
 
+void
+lm_secure_channel_start_handshake (LmSecureChannel *channel, const gchar *host)
+{
+    g_return_if_fail (LM_IS_SECURE_CHANNEL (channel));
+
+    if (!LM_SECURE_CHANNEL_GET_CLASS(channel)->start_handshake) {
+        g_assert_not_reached ();
+    }
+
+    LM_SECURE_CHANNEL_GET_CLASS(channel)->start_handshake (channel, host);
+}
+
+

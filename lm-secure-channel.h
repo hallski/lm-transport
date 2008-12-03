@@ -40,6 +40,27 @@ G_BEGIN_DECLS
 #define LM_IS_SECURE_CHANNEL_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), LM_TYPE_SECURE_CHANNEL))
 #define LM_SECURE_CHANNEL_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), LM_TYPE_SECURE_CHANNEL, LmSecureChannelClass))
 
+typedef enum {
+	LM_CERT_INVALID,
+	LM_CERT_ISSUER_NOT_FOUND,
+	LM_CERT_REVOKED
+} LmCertificateStatus;
+
+typedef enum {
+	LM_SSL_STATUS_NO_CERT_FOUND,	
+	LM_SSL_STATUS_UNTRUSTED_CERT,
+	LM_SSL_STATUS_CERT_EXPIRED,
+	LM_SSL_STATUS_CERT_NOT_ACTIVATED,
+	LM_SSL_STATUS_CERT_HOSTNAME_MISMATCH,			
+	LM_SSL_STATUS_CERT_FINGERPRINT_MISMATCH,			
+	LM_SSL_STATUS_GENERIC_ERROR
+} LmSSLStatus;
+
+typedef enum {
+	LM_SSL_RESPONSE_CONTINUE,
+	LM_SSL_RESPONSE_STOP
+} LmSSLResponse;
+
 typedef struct LmSecureChannel      LmSecureChannel;
 typedef struct LmSecureChannelClass LmSecureChannelClass;
 
@@ -52,7 +73,8 @@ struct LmSecureChannelClass {
     
     /* <vtable> */
     gboolean    (*is_encrypted)      (LmSecureChannel  *channel);
-    void        (*start_handshake)   (LmSecureChannel  *channel);
+    void        (*start_handshake)   (LmSecureChannel  *channel,
+                                      const gchar      *host);
     GIOStatus   (*secure_read)       (LmChannel        *channel,
                                       gchar            *buf,
                                       gsize             count,
@@ -78,7 +100,8 @@ LmChannel    * lm_secure_channel_new      (GMainContext *context,
  *
  */
 gboolean      lm_secure_channel_is_encrypted    (LmSecureChannel *channel);
-void          lm_secure_channel_start_handshake (LmSecureChannel *channel);
+void          lm_secure_channel_start_handshake (LmSecureChannel *channel,
+                                                 const gchar     *host);
 
 const gchar * lm_secure_channel_get_fingerprint (LmSecureChannel *channel);
 
